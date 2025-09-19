@@ -1,94 +1,58 @@
-name: Build Custom Kernel RPM
+name: Build Linux Kernel RPM
 
 on:
-  push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
-  workflow_dispatch:  # pozwala uruchomić ręcznie
+  workflow_dispatch:
 
 jobs:
-  build-kernel:
+  build:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Install build dependencies
-      run: |
-        sudo apt update
-        sudo apt install -y \
-          build-essential \
-          bc \
-          bison \
-          flex \
-          libssl-dev \
-          libelf-dev \
-          dwarves \
-          git \
-          fakeroot \
-          ncurses-dev \
-          xz-utils \
-          libpci-dev \
-          libudev-dev \
-          rpm
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential bc flex bison libssl-dev libncurses-dev \
+            fakeroot dwarves rpm
 
-    - name: Download Linux kernel 6.12
-      run: |
-        wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.12.tar.xz
-        tar xf linux-6.12.tar.xz
+      - name: Download Linux kernel source
+        run: |
+          KERNEL_VERSION=6.12
+          curl -LO https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-$KERNEL_VERSION.tar.xz
+          tar -xvf linux-$KERNEL_VERSION.tar.xz
 
-    - name: Copy custom kernel config
-      run: |
-        cp kernel-config/.config linux-6.12/.config
+      - name: Configure kernel
+        run: |
+          cd linux-6.12
+          cp /boot/config-$(uname -r) .config || make defconfig
+          yes "" | make oldconfig
 
-    - name: Prepare kernel configuration
-      run: |
-        cd linux-6.12
-        yes "" | make oldconfig
+      - name: Build kernel RPM packages
+        run: |
+          cd linux-6.12
+          make -j$(nproc) rpm-pkg
 
-    - name: Show kernel version info
-      run: |
-        cd linux-6.12
-        make kernelversion
-        echo "Building kernel with config:"
-        head -20 .config
+      - name: Save build info
+        run: |
+          cd linux-6.12
+          echo "Build completed at: $(date)" > build-info.txt
+          echo "Kernel version: $(make kernelversion)" >> build-info.txt
+          echo "Built on: $(uname -a)" >> build-info.txt
+          echo "GCC version: $(gcc --version | head -1)" >> build-info.txt
 
-    - name: Build kernel RPMs
-      run: |
-        cd linux-6.12
-        make -j$(nproc) binrpm-pkg
+      - name: Upload RPM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel-rpms
+          path: linux-*/rpmbuild/RPMS/x86_64/*.rpm
+          retention-days: 30
 
-    - name: Find built RPMs
-      run: |
-        echo "=== Searching for built RPMs ==="
-        find $HOME -type f -name "*.rpm" | tee rpm-list.txt
-
-    - name: Create build info
-      run: |
-        cd linux-6.12
-        echo "Build completed at: $(date)" > build-info.txt
-        echo "Kernel version: $(make kernelversion)" >> build-info.txt
-        echo "Built on: $(uname -a)" >> build-info.txt
-        echo "GCC version: $(gcc --version | head -1)" >> build-info.txt
-
-    - name: Upload kernel RPMs
-      uses: actions/upload-artifact@v4
-      with:
-        name: kernel-rpms
-        path: ~/rpmbuild/RPMS/x86_64/*.rpm
-        retention-days: 30
-
-    - name: Upload build info
-      uses: actions/upload-artifact@v4
-      with:
-        name: build-info
-        path: linux-6.12/build-info.txt
-        retention-days: 30
-
-    - name: Show build summary
-      run: |
-        echo "=== Build Summary ==="
-        ls -lh ~/rpmbuild/RPMS/x86_64 || echo "No RPMs found"
-        echo "Build time: $(date)"
+      - name: Upload build info
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-info
+          path: linux-6.12/build-info.txt
+          retention-days: 30
