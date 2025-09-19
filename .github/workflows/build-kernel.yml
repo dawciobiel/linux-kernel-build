@@ -86,7 +86,10 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: kernel-modules
-        path: linux-6.12/*.ko
+        path: |
+          linux-6.12/**/*.ko
+          linux-6.12/modules.builtin
+          linux-6.12/modules.order
         retention-days: 30
 
     - name: Upload build info
