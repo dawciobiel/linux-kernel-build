@@ -1,0 +1,73 @@
+name: Build Custom Kernel RPM
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-kernel-rpm:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install build dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y \
+          build-essential \
+          bc \
+          bison \
+          flex \
+          libssl-dev \
+          libelf-dev \
+          dwarves \
+          git \
+          fakeroot \
+          ncurses-dev \
+          xz-utils \
+          libpci-dev \
+          libudev-dev \
+          rpm
+
+    - name: Download Linux kernel 6.12
+      run: |
+        wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.12.tar.xz
+        tar xf linux-6.12.tar.xz
+
+    - name: Copy custom kernel config
+      run: |
+        cp kernel-config/.config linux-6.12/.config
+
+    - name: Prepare kernel configuration
+      run: |
+        cd linux-6.12
+        yes "" | make olddefconfig
+
+    - name: Show kernel version info
+      run: |
+        cd linux-6.12
+        make kernelversion
+        echo "Building kernel with config:"
+        head -20 .config
+
+    - name: Build RPM packages
+      run: |
+        cd linux-6.12
+        make -j$(nproc) rpm-pkg
+
+    - name: Upload RPM artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: kernel-rpms
+        path: ~/rpmbuild/RPMS/x86_64/*.rpm
+        retention-days: 30
+
+    - name: Show build summary
+      run: |
+        ls -lh ~/rpmbuild/RPMS/x86_64/
+        echo "Build finished at: $(date)"
