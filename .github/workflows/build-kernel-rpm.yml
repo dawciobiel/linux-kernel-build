@@ -5,12 +5,12 @@ on:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
-  workflow_dispatch:
+  workflow_dispatch:  # Pozwala ręcznie uruchomić workflow
 
 jobs:
-  build-kernel-rpm:
+  build-kernel:
     runs-on: ubuntu-latest
-
+    
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -38,6 +38,7 @@ jobs:
       run: |
         wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.12.tar.xz
         tar xf linux-6.12.tar.xz
+        cd linux-6.12
 
     - name: Copy custom kernel config
       run: |
@@ -46,7 +47,7 @@ jobs:
     - name: Prepare kernel configuration
       run: |
         cd linux-6.12
-        yes "" | make olddefconfig
+        yes "" | make oldconfig
 
     - name: Show kernel version info
       run: |
@@ -55,19 +56,36 @@ jobs:
         echo "Building kernel with config:"
         head -20 .config
 
-    - name: Build RPM packages
+    - name: Build kernel RPMs
       run: |
         cd linux-6.12
-        make -j$(nproc) rpm-pkg
+        make -j$(nproc) binrpm-pkg
 
-    - name: Upload RPM artifacts
+    - name: Create build info
+      run: |
+        cd linux-6.12
+        echo "Build completed at: $(date)" > build-info.txt
+        echo "Kernel version: $(make kernelversion)" >> build-info.txt
+        echo "Built on: $(uname -a)" >> build-info.txt
+        echo "GCC version: $(gcc --version | head -1)" >> build-info.txt
+
+    - name: Upload kernel RPMs
       uses: actions/upload-artifact@v4
       with:
         name: kernel-rpms
-        path: ~/rpmbuild/RPMS/x86_64/*.rpm
+        path: linux-6.12/rpmbuild/RPMS/x86_64/*.rpm
+        retention-days: 30
+
+    - name: Upload build info
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-info
+        path: linux-6.12/build-info.txt
         retention-days: 30
 
     - name: Show build summary
       run: |
-        ls -lh ~/rpmbuild/RPMS/x86_64/
-        echo "Build finished at: $(date)"
+        cd linux-6.12
+        echo "=== Build Summary ==="
+        ls -lh rpmbuild/RPMS/x86_64
+        echo "Build time: $(date)"
