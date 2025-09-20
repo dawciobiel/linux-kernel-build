@@ -41,18 +41,17 @@ jobs:
       - name: Prepare .config
         run: |
           cd linux-${KERNEL_VERSION}
-          # Własny konfig możesz podać zamiast defconfig:
+          # Możesz podać własny config zamiast defconfig:
           # cp /path/to/custom.config .config || make defconfig
           make defconfig
 
-      - name: Build RPMs
+      - name: Build binary RPMs
         run: |
           cd linux-${KERNEL_VERSION}
-          make -j$(nproc) rpm-pkg
+          make -j$(nproc) binrpm-pkg
 
       - name: Upload RPMs as Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: kernel-rpms
           path: linux-${{ env.KERNEL_VERSION }}/rpmbuild/RPMS/x86_64/*.rpm
-
