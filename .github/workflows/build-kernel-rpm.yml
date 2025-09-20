@@ -1,4 +1,4 @@
-name: Build Linux Kernel RPMs
+name: Build Linux Kernel RPMs (with more deps + debug)
 
 on:
   workflow_dispatch:
@@ -18,24 +18,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            build-essential \
-            bc \
-            bison \
-            flex \
-            libssl-dev \
-            libncurses-dev \
-            libelf-dev \
-            libdw-dev \
-            zlib1g-dev \
-            xz-utils \
-            liblzma-dev \
-            rpm \
-            fakeroot \
-            dwarves \
-            git \
-            curl \
-            python3 \
-            perl
+            build-essential bc bison flex libssl-dev libncurses-dev \
+            libelf-dev libdw-dev libelf1 zlib1g-dev xz-utils \
+            liblzma-dev rpm fakeroot dwarves git perl python3 binutils
 
       - name: Download Linux kernel source
         run: |
@@ -48,10 +33,10 @@ jobs:
           cp /boot/config-$(uname -r) .config || make defconfig
           yes "" | make oldconfig
 
-      - name: Build kernel RPM packages
+      - name: Build kernel RPM packages with debug
         run: |
           cd linux-${KERNEL_VERSION}
-          make -j$(nproc) binrpm-pkg
+          make -j$(nproc) binrpm-pkg || { echo "build failed, dumping last lines of log"; tail -n100 build.log; exit 1; }
 
       - name: Copy RPMs to artifacts folder
         run: |
