@@ -11,14 +11,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # potrzebne do poprawnego pushowania
+          persist-credentials: true  # potrzebne do automatycznego push
 
       - name: Install build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             build-essential bc flex bison libssl-dev libncurses-dev \
-            fakeroot dwarves rpm git curl xz-utils
+            fakeroot dwarves rpm libelf-dev libdw-dev libelf1 git curl xz-utils
 
       - name: Download Linux kernel source
         run: |
@@ -29,8 +29,7 @@ jobs:
       - name: Configure kernel
         run: |
           cd linux-6.12
-          # Jeśli masz własną konfigurację w repo
-          cp ../kernel-config/.config .config || make defconfig
+          cp /boot/config-$(uname -r) .config || make defconfig
           yes "" | make oldconfig
 
       - name: Build kernel RPM packages
@@ -42,6 +41,14 @@ jobs:
         run: |
           mkdir -p artifacts/kernel
           cp linux-6.12/rpmbuild/RPMS/x86_64/*.rpm artifacts/kernel/ || echo "No RPMs to copy"
+
+      - name: Commit and push RPMs to repository
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add artifacts/kernel/*.rpm
+          git commit -m "Add built kernel RPMs" || echo "Nothing to commit"
+          git push
 
       - name: Save build info
         run: |
@@ -64,16 +71,3 @@ jobs:
           name: build-info
           path: linux-6.12/build-info.txt
           retention-days: 30
-
-      - name: Commit and push RPMs to repo
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          mkdir -p rpm
-          cp linux-6.12/rpmbuild/RPMS/x86_64/*.rpm rpm/ || echo "No RPMs to copy"
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-          git add rpm/*.rpm
-          git commit -m "Add kernel RPMs from GitHub Actions build" || echo "No changes to commit"
-          git push origin HEAD
-
