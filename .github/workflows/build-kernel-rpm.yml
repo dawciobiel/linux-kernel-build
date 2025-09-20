@@ -48,7 +48,7 @@ jobs:
       - name: Build RPMs
         run: |
           cd linux-${KERNEL_VERSION}
-          make -j$(nproc) binrpm-pkg
+          make -j$(nproc) rpm-pkg
 
       - name: Upload RPMs as Artifacts
         uses: actions/upload-artifact@v4
