@@ -1,77 +1,68 @@
-name: Build Kernel RPM with Full Cache
+name: Build Linux Kernel RPMs
 
 on:
-  workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [ main ]
+  workflow_dispatch:
 
 env:
   KERNEL_VERSION: 6.12
-  CONFIG_FILE: kernel-config-amdfx.config
-  RPM_OUTPUT_DIR: rpms
+  RPM_OUTPUT_DIR: rpmbuild/RPMS/x86_64
 
 jobs:
-  build:
+  build-kernel:
     runs-on: ubuntu-latest
-
+    defaults:
+      run:
+        shell: bash
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install build dependencies
+      - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential libncurses-dev bison flex libssl-dev libelf-dev bc rpm
+          sudo apt-get install -y \
+            build-essential libncurses-dev bison flex libssl-dev libelf-dev \
+            rpm curl bc ccache git dwarves
 
-      - name: Create directories
-        run: |
-          mkdir -p linux-${{ env.KERNEL_VERSION }}
-          mkdir -p ${RPM_OUTPUT_DIR}
-
-      - name: Download kernel source
-        run: |
-          curl -LO https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${{ env.KERNEL_VERSION }}.tar.xz
-          tar -xf linux-${{ env.KERNEL_VERSION }}.tar.xz -C .
-
-      - name: Apply start config
-        run: |
-          cp ${{ env.CONFIG_FILE }} linux-${{ env.KERNEL_VERSION }}/.config
-
-      - name: Cache full kernel build
+      - name: Cache ccache
         uses: actions/cache@v3
         with:
-          path: |
-            linux-${{ env.KERNEL_VERSION }}/.config
-            linux-${{ env.KERNEL_VERSION }}/.tmp_versions
-            linux-${{ env.KERNEL_VERSION }}/build
-            linux-${{ env.KERNEL_VERSION }}/scripts
-            linux-${{ env.KERNEL_VERSION }}/tools/objtool
-            linux-${{ env.KERNEL_VERSION }}/rpmbuild
-          key: kernel-full-build-${{ env.KERNEL_VERSION }}-${{ runner.os }}-${{ hashFiles(env.CONFIG_FILE) }}
+          path: ~/.ccache
+          key: ${{ runner.os }}-ccache-${{ hashFiles('**/Makefile') }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-
 
-      - name: Build kernel RPMs
-        working-directory: linux-${{ env.KERNEL_VERSION }}
+      - name: Download Linux Kernel
         run: |
-          make oldconfig
-          make -j$(nproc) binrpm-pkg KERNELRELEASE=${{ env.KERNEL_VERSION }} \
-            RPM_OUTPUT=${PWD}/rpmbuild/RPMS/x86_64 || { echo "Kernel build failed"; exit 1; }
+          curl -LO https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${KERNEL_VERSION}.tar.xz
+          tar -xf linux-${KERNEL_VERSION}.tar.xz
 
-      - name: Copy RPMs to artifacts folder
+      - name: Prepare .config
         run: |
-          mkdir -p ../${RPM_OUTPUT_DIR}
-          cp rpmbuild/RPMS/x86_64/*.rpm ../${RPM_OUTPUT_DIR}/
+          cd linux-${KERNEL_VERSION}
+          # Tutaj możesz podać własny konfig: 
+          # cp /path/to/custom.config .config || make defconfig
+          make defconfig
+
+      - name: Build RPMs
+        run: |
+          cd linux-${KERNEL_VERSION}
+          make -j$(nproc) binrpm-pkg
 
       - name: Upload RPMs as Artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: kernel-rpms
           path: ${{ env.RPM_OUTPUT_DIR }}/*.rpm
 
       - name: Commit & push RPMs to repo
         run: |
-          git config --local user.name "github-actions"
-          git config --local user.email "actions@github.com"
-          git add ${RPM_OUTPUT_DIR}/*.rpm
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          mkdir -p kernel-rpms
+          cp ${{ env.RPM_OUTPUT_DIR }}/*.rpm kernel-rpms/
+          git add kernel-rpms/
           git commit -m "Add built kernel RPMs"
-          git push
+          git push || echo "No changes to push"
