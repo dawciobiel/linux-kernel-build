@@ -35,6 +35,16 @@ jobs:
           cd linux-6.12
           make -j$(nproc) rpm-pkg
 
+      - name: Copy RPMs to artifacts directory
+        run: |
+          mkdir -p artifacts/kernel
+          cp linux-*/rpmbuild/RPMS/x86_64/*.rpm artifacts/kernel/ || echo "No RPMs to copy"
+
+      - name: List RPMs in artifacts directory
+        run: |
+          echo "=== RPMs in artifacts/kernel ==="
+          ls -lh artifacts/kernel/
+
       - name: Save build info
         run: |
           cd linux-6.12
@@ -47,7 +57,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: kernel-rpms
-          path: linux-*/rpmbuild/RPMS/x86_64/*.rpm
+          path: artifacts/kernel/*.rpm
           retention-days: 30
 
       - name: Upload build info
