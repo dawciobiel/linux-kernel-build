@@ -1,10 +1,15 @@
-name: Build Linux Kernel
+name: Build Kernel RPM with Full Cache
 
 on:
   workflow_dispatch:
   push:
     branches:
       - main
+
+env:
+  KERNEL_VERSION: 6.12
+  CONFIG_FILE: kernel-config-amdfx.config
+  RPM_OUTPUT_DIR: rpms
 
 jobs:
   build:
@@ -14,57 +19,59 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Cache dla ccache
-      - name: Setup ccache
-        uses: actions/cache@v4
-        with:
-          path: ~/.ccache
-          key: ${{ runner.os }}-ccache-${{ github.ref }}-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-ccache-${{ github.ref }}
-            ${{ runner.os }}-ccache-
-
-      - name: Install dependencies
+      - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            build-essential flex bison libssl-dev \
-            libncurses-dev libelf-dev dwarves ccache
+          sudo apt-get install -y build-essential libncurses-dev bison flex libssl-dev libelf-dev bc rpm
 
-      - name: Download Linux kernel source
+      - name: Create directories
         run: |
-          wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.12.1.tar.xz
-          tar -xvf linux-6.12.1.tar.xz
-          cd linux-6.12.1
-          echo "KERNEL_SRC=$PWD" >> $GITHUB_ENV
+          mkdir -p linux-${{ env.KERNEL_VERSION }}
+          mkdir -p ${RPM_OUTPUT_DIR}
 
-      - name: Configure kernel
+      - name: Download kernel source
         run: |
-          cd $KERNEL_SRC
-          if [ -f "${GITHUB_WORKSPACE}/kernel.config" ]; then
-            echo "Using custom kernel.config"
-            cp "${GITHUB_WORKSPACE}/kernel.config" .config
-          else
-            echo "No custom config found, using defconfig"
-            make defconfig
-          fi
+          curl -LO https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${{ env.KERNEL_VERSION }}.tar.xz
+          tar -xf linux-${{ env.KERNEL_VERSION }}.tar.xz -C .
 
-      - name: Build kernel
+      - name: Apply start config
         run: |
-          cd $KERNEL_SRC
-          export PATH="/usr/lib/ccache:$PATH"
-          export CC="ccache gcc"
-          export CXX="ccache g++"
-          make -j$(nproc)
+          cp ${{ env.CONFIG_FILE }} linux-${{ env.KERNEL_VERSION }}/.config
 
-      - name: Package kernel
-        run: |
-          cd $KERNEL_SRC
-          make -j$(nproc) bindeb-pkg
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+      - name: Cache full kernel build
+        uses: actions/cache@v3
         with:
-          name: kernel-packages
           path: |
-            ../*.deb
+            linux-${{ env.KERNEL_VERSION }}/.config
+            linux-${{ env.KERNEL_VERSION }}/.tmp_versions
+            linux-${{ env.KERNEL_VERSION }}/build
+            linux-${{ env.KERNEL_VERSION }}/scripts
+            linux-${{ env.KERNEL_VERSION }}/tools/objtool
+            linux-${{ env.KERNEL_VERSION }}/rpmbuild
+          key: kernel-full-build-${{ env.KERNEL_VERSION }}-${{ runner.os }}-${{ hashFiles(env.CONFIG_FILE) }}
+
+      - name: Build kernel RPMs
+        working-directory: linux-${{ env.KERNEL_VERSION }}
+        run: |
+          make oldconfig
+          make -j$(nproc) binrpm-pkg KERNELRELEASE=${{ env.KERNEL_VERSION }} \
+            RPM_OUTPUT=${PWD}/rpmbuild/RPMS/x86_64 || { echo "Kernel build failed"; exit 1; }
+
+      - name: Copy RPMs to artifacts folder
+        run: |
+          mkdir -p ../${RPM_OUTPUT_DIR}
+          cp rpmbuild/RPMS/x86_64/*.rpm ../${RPM_OUTPUT_DIR}/
+
+      - name: Upload RPMs as Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: kernel-rpms
+          path: ${{ env.RPM_OUTPUT_DIR }}/*.rpm
+
+      - name: Commit & push RPMs to repo
+        run: |
+          git config --local user.name "github-actions"
+          git config --local user.email "actions@github.com"
+          git add ${RPM_OUTPUT_DIR}/*.rpm
+          git commit -m "Add built kernel RPMs"
+          git push
