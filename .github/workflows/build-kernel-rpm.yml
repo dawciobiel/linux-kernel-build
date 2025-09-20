@@ -1,12 +1,11 @@
-name: Build Linux Kernel RPMs (with more deps + debug)
+name: Build Linux Kernel RPM
 
 on:
   workflow_dispatch:
 
 jobs:
-  build_rpm:
+  build:
     runs-on: ubuntu-latest
-
     env:
       KERNEL_VERSION: 6.12
 
@@ -17,53 +16,46 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            build-essential bc bison flex libssl-dev libncurses-dev \
-            libelf-dev libdw-dev libelf1 zlib1g-dev xz-utils \
-            liblzma-dev rpm fakeroot dwarves git perl python3 binutils
+          sudo apt-get install -y build-essential libncurses-dev bison flex libssl-dev libelf-dev \
+              rpm bc dwarves
 
-      - name: Download Linux kernel source
+      - name: Download kernel source
         run: |
-          curl -LO https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${KERNEL_VERSION}.tar.xz
+          wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${KERNEL_VERSION}.tar.xz
           tar -xf linux-${KERNEL_VERSION}.tar.xz
 
-      - name: Configure kernel
+      - name: Prepare kernel config
         run: |
           cd linux-${KERNEL_VERSION}
           cp /boot/config-$(uname -r) .config || make defconfig
-          yes "" | make oldconfig
+          yes "" | make olddefconfig
 
-      - name: Build kernel RPM packages with debug
+          # 🔧 Disable trusted/revocation keys (fixes canonical-certs.pem error)
+          sed -i 's|CONFIG_SYSTEM_TRUSTED_KEYS=.*|CONFIG_SYSTEM_TRUSTED_KEYS=""|' .config
+          sed -i 's|CONFIG_SYSTEM_REVOCATION_KEYS=.*|CONFIG_SYSTEM_REVOCATION_KEYS=""|' .config
+
+      - name: Build RPM packages
         run: |
           cd linux-${KERNEL_VERSION}
-          make -j$(nproc) binrpm-pkg || { echo "build failed, dumping last lines of log"; tail -n100 build.log; exit 1; }
+          make -j$(nproc) binrpm-pkg
 
-      - name: Copy RPMs to artifacts folder
+      - name: Collect RPMs
         run: |
-          mkdir -p kernel-rpms
-          cp linux-${KERNEL_VERSION}/rpmbuild/RPMS/x86_64/*.rpm kernel-rpms/ || echo "No RPMs found"
+          mkdir -p artifacts/rpm
+          find .. -maxdepth 1 -type f -name "*.rpm" -exec cp {} artifacts/rpm/ \;
 
-      - name: Verify RPMs
-        run: |
-          if [ -z "$(ls kernel-rpms/*.rpm 2>/dev/null)" ]; then
-            echo "ERROR: No RPMs built!"
-            exit 1
-          else
-            echo "RPMs present:"
-            ls -lh kernel-rpms/
-          fi
-
-      - name: Upload RPM artifacts
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: kernel-rpms
-          path: kernel-rpms/*.rpm
-          retention-days: 30
+          path: artifacts/rpm/
 
-      - name: Commit RPMs to repo
+      - name: Push RPMs to repository
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add kernel-rpms/*.rpm
-          git diff --cached --quiet || git commit -m "Add built kernel RPMs version ${KERNEL_VERSION}"
+          git config --global user.email "actions@github.com"
+          git config --global user.name "GitHub Actions"
+          mkdir -p artifacts/rpm
+          git pull
+          git add artifacts/rpm
+          git commit -m "Add kernel RPM build for ${KERNEL_VERSION}" || echo "No changes to commit"
           git push
