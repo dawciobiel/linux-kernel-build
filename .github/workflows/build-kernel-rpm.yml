@@ -7,7 +7,6 @@ on:
 
 env:
   KERNEL_VERSION: 6.12
-  RPM_OUTPUT_DIR: rpmbuild/RPMS/x86_64
 
 jobs:
   build-kernel:
@@ -42,7 +41,7 @@ jobs:
       - name: Prepare .config
         run: |
           cd linux-${KERNEL_VERSION}
-          # Tutaj możesz podać własny konfig: 
+          # Własny konfig możesz podać zamiast defconfig:
           # cp /path/to/custom.config .config || make defconfig
           make defconfig
 
@@ -55,14 +54,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: kernel-rpms
-          path: ${{ env.RPM_OUTPUT_DIR }}/*.rpm
+          path: linux-${{ env.KERNEL_VERSION }}/rpmbuild/RPMS/x86_64/*.rpm
 
-      - name: Commit & push RPMs to repo
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          mkdir -p kernel-rpms
-          cp ${{ env.RPM_OUTPUT_DIR }}/*.rpm kernel-rpms/
-          git add kernel-rpms/
-          git commit -m "Add built kernel RPMs"
-          git push || echo "No changes to push"
