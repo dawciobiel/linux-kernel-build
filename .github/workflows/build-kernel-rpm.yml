@@ -7,52 +7,45 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    env:
+      KERNEL_VERSION: 6.12
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          persist-credentials: true  # potrzebne do automatycznego push
 
       - name: Install build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             build-essential bc flex bison libssl-dev libncurses-dev \
-            fakeroot dwarves rpm libelf-dev libdw-dev libelf1 git curl xz-utils
+            fakeroot dwarves rpm libelf-dev libdw-dev libelf1 \
+            xz-utils zlib1g-dev git curl
 
       - name: Download Linux kernel source
         run: |
-          KERNEL_VERSION=6.12
-          curl -LO https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-$KERNEL_VERSION.tar.xz
-          tar -xvf linux-$KERNEL_VERSION.tar.xz
+          curl -LO https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${KERNEL_VERSION}.tar.xz
+          tar -xvf linux-${KERNEL_VERSION}.tar.xz
 
       - name: Configure kernel
         run: |
-          cd linux-6.12
+          cd linux-${KERNEL_VERSION}
           cp /boot/config-$(uname -r) .config || make defconfig
           yes "" | make oldconfig
 
       - name: Build kernel RPM packages
         run: |
-          cd linux-6.12
+          cd linux-${KERNEL_VERSION}
           make -j$(nproc) binrpm-pkg
 
       - name: Copy RPMs to artifacts directory
         run: |
           mkdir -p artifacts/kernel
-          cp linux-6.12/rpmbuild/RPMS/x86_64/*.rpm artifacts/kernel/ || echo "No RPMs to copy"
-
-      - name: Commit and push RPMs to repository
-        run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-          git add artifacts/kernel/*.rpm
-          git commit -m "Add built kernel RPMs" || echo "Nothing to commit"
-          git push
+          cp linux-${KERNEL_VERSION}/rpmbuild/RPMS/x86_64/*.rpm artifacts/kernel/ || echo "No RPMs to copy"
 
       - name: Save build info
         run: |
-          cd linux-6.12
+          cd linux-${KERNEL_VERSION}
           echo "Build completed at: $(date)" > build-info.txt
           echo "Kernel version: $(make kernelversion)" >> build-info.txt
           echo "Built on: $(uname -a)" >> build-info.txt
@@ -69,5 +62,15 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: build-info
-          path: linux-6.12/build-info.txt
+          path: linux-${KERNEL_VERSION}/build-info.txt
           retention-days: 30
+
+      - name: Commit & push RPMs to repo
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          mkdir -p rpms
+          cp linux-${KERNEL_VERSION}/rpmbuild/RPMS/x86_64/*.rpm rpms/ || echo "No RPMs to copy"
+          git add rpms/
+          git commit -m "Add built kernel RPMs for version ${KERNEL_VERSION}" || echo "No changes to commit"
+          git push
