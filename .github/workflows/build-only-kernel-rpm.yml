@@ -1,0 +1,64 @@
+name: Build Only Linux Kernel RPM
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential bc flex bison libssl-dev libncurses-dev \
+            fakeroot dwarves rpm git curl xz-utils libelf-dev libpci-dev libudev-dev
+
+      - name: Download Linux kernel source
+        run: |
+          KERNEL_VERSION=6.12
+          curl -LO https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-$KERNEL_VERSION.tar.xz
+          tar -xf linux-$KERNEL_VERSION.tar.xz
+
+      - name: Configure kernel
+        run: |
+          cd linux-6.12
+          cp /boot/config-$(uname -r) .config || make defconfig
+          yes "" | make oldconfig
+
+      - name: Build kernel RPM packages
+        run: |
+          cd linux-6.12
+          # Tworzy binarne RPM-y: kernel, devel, headers
+          make -j$(nproc) binrpm-pkg
+
+      - name: List RPMs
+        run: |
+          echo "=== Generated RPMs ==="
+          ls -lh linux-6.12/rpmbuild/RPMS/x86_64/
+
+      - name: Upload RPM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel-rpms
+          path: linux-6.12/rpmbuild/RPMS/x86_64/*.rpm
+          retention-days: 30
+
+      - name: Save build info
+        run: |
+          cd linux-6.12
+          echo "Build completed at: $(date)" > build-info.txt
+          echo "Kernel version: $(make kernelversion)" >> build-info.txt
+          echo "Built on: $(uname -a)" >> build-info.txt
+          echo "GCC version: $(gcc --version | head -1)" >> build-info.txt
+
+      - name: Upload build info
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-info
+          path: linux-6.12/build-info.txt
+          retention-days: 30
