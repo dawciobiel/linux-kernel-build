@@ -1,10 +1,10 @@
-name: Build Linux Kernel RPM
+name: Build Linux Kernel RPMs
 
 on:
   workflow_dispatch:
 
 jobs:
-  build-rpm:
+  build_rpm:
     runs-on: ubuntu-latest
 
     env:
@@ -18,40 +18,50 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            build-essential bc flex bison libssl-dev libncurses-dev \
-            fakeroot dwarves rpm libelf-dev libdw-dev libz-dev git curl
+            build-essential bc bison flex libssl-dev libncurses-dev \
+            libelf-dev rpm fakeroot dwarves git
 
       - name: Download Linux kernel source
         run: |
           curl -LO https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${KERNEL_VERSION}.tar.xz
           tar -xf linux-${KERNEL_VERSION}.tar.xz
 
-      - name: Build kernel RPM packages
+      - name: Configure kernel
         run: |
           cd linux-${KERNEL_VERSION}
-          # Jeśli nie ma config, użyj defconfig
           cp /boot/config-$(uname -r) .config || make defconfig
           yes "" | make oldconfig
+
+      - name: Build RPM packages
+        run: |
+          cd linux-${KERNEL_VERSION}
           make -j$(nproc) binrpm-pkg
 
       - name: Copy RPMs to artifacts folder
         run: |
-          mkdir -p artifacts/kernel-rpms
-          cp linux-${KERNEL_VERSION}/rpmbuild/RPMS/x86_64/*.rpm artifacts/kernel-rpms/ || echo "No RPMs to copy"
+          mkdir -p kernel-rpms
+          cp linux-${KERNEL_VERSION}/rpmbuild/RPMS/x86_64/*.rpm kernel-rpms/ || echo "No RPMs found"
+
+      - name: Verify RPMs exist
+        run: |
+          if [ -z "$(ls -A kernel-rpms/*.rpm 2>/dev/null)" ]; then
+            echo "ERROR: No RPM files were built!"
+            exit 1
+          else
+            echo "RPM files verified."
+          fi
+
+      - name: Commit and push RPMs to repository
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add kernel-rpms/*.rpm
+          git diff --cached --quiet || git commit -m "Add built kernel RPMs"
+          git push || echo "Nothing to push"
 
       - name: Upload RPM artifacts
         uses: actions/upload-artifact@v4
         with:
           name: kernel-rpms
-          path: artifacts/kernel-rpms/*.rpm
+          path: kernel-rpms/*.rpm
           retention-days: 30
-
-      - name: Commit RPMs to repo
-        run: |
-          git config --global user.name "github-actions"
-          git config --global user.email "github-actions@users.noreply.github.com"
-          mkdir -p kernel-rpms
-          cp artifacts/kernel-rpms/*.rpm kernel-rpms/ || echo "No RPMs to copy"
-          git add kernel-rpms
-          git commit -m "Add built kernel RPMs" || echo "No changes to commit"
-          git push
