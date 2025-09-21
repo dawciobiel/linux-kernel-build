@@ -32,7 +32,8 @@ jobs:
           zypper refresh
           zypper install -y \
             make gcc ncurses-devel bison flex libopenssl-devel libelf-devel \
-            rpm-build ccache bc gpg2 perl wget gzip tar fakeroot perl-Text-Template
+            rpm-build ccache bc gpg2 perl wget gzip tar fakeroot perl-Text-Template \
+            inetutils git
 
       - name: Cache ccache
         uses: actions/cache@v3
@@ -53,10 +54,9 @@ jobs:
           echo "%_gpgbin /usr/bin/gpg" >> ~/.rpmmacros
           echo "%__gpg_sign_cmd %{__gpg} gpg --batch --no-tty --pinentry-mode loopback --passphrase ${GPG_PASSPHRASE} --no-armor --detach-sign --sign --local-user %{_gpg_name} %{__plaintext_filename} > %{__signature_filename}" >> ~/.rpmmacros
 
-      - name: Download Linux Kernel
+      - name: Clone Linux Kernel from git
         run: |
-          wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${KERNEL_VERSION}.tar.xz
-          tar -xf linux-${KERNEL_VERSION}.tar.xz
+          git clone --branch v${KERNEL_VERSION} --depth 1 https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git linux-${KERNEL_VERSION}
 
       - name: Prepare custom .config
         run: |
