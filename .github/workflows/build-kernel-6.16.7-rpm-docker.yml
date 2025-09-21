@@ -1,0 +1,57 @@
+name: Build Custom Kernel RPM (Docker)
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-kernel:
+    runs-on: ubuntu-latest  # host tylko do uruchomienia Dockera
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build kernel inside Docker
+        run: |
+          docker run --rm -t \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            registry.opensuse.org/tumbleweed/opensuse:latest \
+            /bin/bash -c "
+              set -e
+
+              echo 'Updating system and installing build tools...'
+              zypper -n ref
+              zypper -n in -t pattern devel_basis rpm-build make gcc bc perl bison flex elfutils-devel ncurses-devel git wget rpm-sign
+
+              echo 'Copying custom kernel config...'
+              mkdir -p /usr/src/linux-6.16.7-1-obj/x86_64/default
+              cp kernel-config/.config /usr/src/linux-6.16.7-1-obj/x86_64/default/.config
+
+              echo 'Building kernel RPMs...'
+              cd /usr/src/linux-6.16.7-1-obj
+              make -j\$(nproc) rpm
+
+              echo 'Importing GPG key for signing...'
+              echo \"${{ secrets.GPG_PRIVATE_KEY }}\" | gpg --batch --import
+
+              echo 'Signing RPMs...'
+              for rpm in x86_64/RPMS/*.rpm; do
+                rpmsign --addsign \$rpm
+              done
+
+              echo 'Kernel RPMs build complete'
+            "
+
+      - name: Upload kernel RPMs
+        uses: actions/upload-artifact@v3
+        with:
+          name: kernel-rpms
+          path: |
+            kernel-config/x86_64/RPMS/*.rpm
