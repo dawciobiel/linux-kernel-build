@@ -1,4 +1,4 @@
-name: Build Custom Kernel RPM (Docker)
+name: Build Custom Kernel RPM (Docker with Cache and GPG passphrase)
 
 on:
   push:
@@ -17,19 +17,49 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
+      - name: Cache zypper packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            /tmp/zypp-cache
+          key: zypper-cache-${{ hashFiles('kernel-config/.config') }}
+          restore-keys: |
+            zypper-cache-
+
+      - name: Cache kernel build
+        uses: actions/cache@v4
+        with:
+          path: /usr/src/linux-6.16.7-1-obj
+          key: kernel-build-${{ hashFiles('kernel-config/.config') }}
+          restore-keys: |
+            kernel-build-
+
       - name: Build kernel inside Docker
         run: |
           docker run --rm -t \
             -v ${{ github.workspace }}:/workspace \
+            -v /tmp/zypp-cache:/var/cache/zypp \
             -w /workspace \
             opensuse/tumbleweed \
             /bin/bash -c "
               set -e
 
-              echo 'Adding standard Tumbleweed repositories...'
-              zypper ar -f http://download.opensuse.org/tumbleweed/repo/oss/ repo-oss
-              zypper ar -f http://download.opensuse.org/tumbleweed/repo/non-oss/ repo-non-oss
-              zypper ar -f http://download.opensuse.org/update/tumbleweed/ repo-update
+              echo 'Adding standard Tumbleweed repositories if missing...'
+              for repo in repo-oss repo-non-oss repo-update; do
+                  if ! zypper lr | grep -q \"$repo\"; then
+                      case \$repo in
+                          repo-oss)
+                              zypper ar -f http://download.opensuse.org/tumbleweed/repo/oss/ \$repo
+                              ;;
+                          repo-non-oss)
+                              zypper ar -f http://download.opensuse.org/tumbleweed/repo/non-oss/ \$repo
+                              ;;
+                          repo-update)
+                              zypper ar -f http://download.opensuse.org/update/tumbleweed/ \$repo
+                              ;;
+                      esac
+                  fi
+              done
 
               echo 'Refreshing repositories...'
               zypper ref
@@ -49,9 +79,9 @@ jobs:
               echo 'Importing GPG key for signing...'
               echo \"${{ secrets.GPG_PRIVATE_KEY }}\" | gpg --batch --import
 
-              echo 'Signing RPMs...'
+              echo 'Signing RPMs with passphrase...'
               for rpm in x86_64/RPMS/*.rpm; do
-                rpmsign --addsign \$rpm
+                  rpmsign --addsign --passphrase \"${{ secrets.GPG_PASSPHRASE }}\" \$rpm
               done
 
               echo 'Kernel RPMs build complete'
