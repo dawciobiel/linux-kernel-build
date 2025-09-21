@@ -34,7 +34,7 @@ jobs:
             make gcc ncurses-devel bison flex libopenssl-devel libelf-devel \
             rpm-build ccache bc gpg2 perl wget gzip tar fakeroot perl-Text-Template \
             hostname git \
-            libdw-devel dwarves python3-base rsync
+            libdw-devel dwarves python3 python3-pip python3-setuptools python3-wheel rsync
 
       - name: Cache ccache
         uses: actions/cache@v3
@@ -54,6 +54,13 @@ jobs:
           echo "%_gpg_path ~/.gnupg" >> ~/.rpmmacros
           echo "%_gpgbin /usr/bin/gpg" >> ~/.rpmmacros
           echo "%__gpg_sign_cmd %{__gpg} gpg --batch --no-tty --pinentry-mode loopback --passphrase ${GPG_PASSPHRASE} --no-armor --detach-sign --sign --local-user %{_gpg_name} %{__plaintext_filename} > %{__signature_filename}" >> ~/.rpmmacros
+
+      - name: Show available memory and swap
+        run: |
+          echo "Memory info:"
+          free -h
+          echo "Disk usage:"
+          df -h
 
       - name: Set build limits
         run: |
