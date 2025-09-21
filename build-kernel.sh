@@ -39,7 +39,7 @@ zypper ref
 
 # Instalacja pakietów do builda kernela
 zypper -n in -t pattern devel_basis
-zypper -n in bc bison elfutils-devel flex gcc git make ncurses-devel perl rpm-build rpm-sign wget
+zypper -n in bc bison flex gcc git make ncurses-devel perl rpm-build wget libelf-devel
 
 # Kopiowanie customowego .config
 mkdir -p "$KERNEL_OBJ_DIR/x86_64/default"
