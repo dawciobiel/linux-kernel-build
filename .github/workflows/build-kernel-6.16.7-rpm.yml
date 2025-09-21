@@ -1,82 +1,46 @@
-name: Build Custom Kernel (openSUSE Tumbleweed)
+name: Build Linux Kernel RPM
 
 on:
   workflow_dispatch:
-    inputs:
-      enable_signing:
-        description: "Enable kernel module signing (true/false)"
-        required: true
-        default: "false"
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: opensuse/tumbleweed
     env:
-      ENABLE_SIGNING: ${{ github.event.inputs.enable_signing }}
+      KERNEL_VERSION: 6.16.7
+      KERNEL_RELEASE: 1
+      LOCALVERSION: -custom
+      GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+      GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Install dependencies
+      - name: Install build dependencies
         run: |
-          sudo apt update
-          sudo apt install -y \
-            build-essential libncurses-dev bison flex libssl-dev libelf-dev wget bc cpio
+          sudo zypper refresh
+          sudo zypper install -y \
+            make gcc ncurses-devel bison flex libopenssl-devel libelf-devel \
+            rpm-build ccache bc gpg2 perl wget gzip tar fakeroot perl-Text-Template \
+            git python3 rsync dwarves
 
-      - name: Download kernel source
+      - name: Prepare custom .config
         run: |
-          KERNEL_VERSION=6.16.7
-          wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-$KERNEL_VERSION.tar.xz
-          tar -xvf linux-$KERNEL_VERSION.tar.xz
-          mv linux-$KERNEL_VERSION linux
-          ls -lah
+          cd linux-${KERNEL_VERSION}
+          cp $GITHUB_WORKSPACE/kernel-config/6.16.7-1-default.custom/current .config
+          make olddefconfig
 
-      - name: Copy SUSE kernel config
+      - name: Build kernel and RPM packages
         run: |
-          cp /usr/src/linux-$(uname -r | cut -d- -f1)-obj/x86_64/default/.config linux/.config || true
+          cd linux-${KERNEL_VERSION}
+          make -j$(nproc) rpm-pkg \
+            LOCALVERSION=${LOCALVERSION} \
+            KDEB_PKGVERSION=${KERNEL_VERSION}-${KERNEL_RELEASE} \
+            RPMOPTS="--define 'dist .custom' --define '_rpmdir $HOME/rpmbuild/RPMS/x86_64'"
 
-      - name: Configure signing
-        run: |
-          cd linux
-          if [ "$ENABLE_SIGNING" = "true" ]; then
-            echo "⚡ Enabling module signing..."
-            scripts/config --enable MODULE_SIG
-            scripts/config --enable SYSTEM_TRUSTED_KEYS
-            scripts/config --enable SYSTEM_REVOCATION_KEYS
-          else
-            echo "⚡ Disabling module signing..."
-            scripts/config --disable MODULE_SIG
-            scripts/config --disable SYSTEM_TRUSTED_KEYS
-            scripts/config --disable SYSTEM_REVOCATION_KEYS
-          fi
-          yes "" | make olddefconfig
-
-      - name: Build kernel
-        run: |
-          cd linux
-          make -j$(nproc)
-
-      - name: Build kernel modules
-        run: |
-          cd linux
-          make -j$(nproc) modules
-
-      - name: Install modules
-        run: |
-          cd linux
-          sudo make modules_install
-
-      - name: Install kernel
-        run: |
-          cd linux
-          sudo make install
-
-      - name: Archive kernel artifacts
+      - name: Upload RPM artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: suse-kernel
-          path: |
-            /boot/vmlinuz-*
-            /boot/initrd-*
-            /lib/modules/*
+          name: kernel-rpms
+          path: linux-${KERNEL_VERSION}/rpmbuild/RPMS/x86_64/
