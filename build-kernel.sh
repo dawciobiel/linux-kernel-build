@@ -2,9 +2,8 @@
 set -eux
 
 # -------------------------
-# Incremental kernel build script
-# -------------------------
-# Użycie: ./build-kernel.sh <ścieżka_do_configu>
+# Incremental kernel build script for Tumbleweed Docker
+# Usage: ./build-kernel.sh <ścieżka_do_configu>
 # -------------------------
 
 CONFIG_PATH="$1"
@@ -14,8 +13,8 @@ if [ -z "$CONFIG_PATH" ]; then
     exit 1
 fi
 
-# Katalog buildowy kernela
-KERNEL_OBJ_DIR=/usr/src/linux-6.16.7-1-obj
+# katalog buildowy kernela
+KERNEL_SRC_DIR=/usr/src/linux-6.16.7-1
 
 # Dodawanie repozytoriów Tumbleweed jeśli brak
 for repo in repo-oss repo-non-oss repo-update; do
@@ -34,21 +33,25 @@ for repo in repo-oss repo-non-oss repo-update; do
     fi
 done
 
-# Odświeżanie repozytoriów
+# Odświeżanie repo
 zypper ref
 
 # Instalacja pakietów do builda kernela
 zypper -n in -t pattern devel_basis
-zypper -n in bc bison flex gcc git make ncurses-devel perl rpm-build wget libelf-devel
+zypper -n in bc bison flex gcc git make ncurses-devel perl rpm-build wget libelf-devel kernel-source kernel-devel
 
-# Kopiowanie customowego .config
-mkdir -p "$KERNEL_OBJ_DIR/x86_64/default"
-cp -u "$CONFIG_PATH" "$KERNEL_OBJ_DIR/x86_64/default/.config"
+# Tworzymy katalog buildowy i kopiujemy config
+BUILD_OBJ_DIR=/usr/src/linux-6.16.7-1-obj
+mkdir -p "$BUILD_OBJ_DIR/x86_64/default"
+cp -u "$CONFIG_PATH" "$BUILD_OBJ_DIR/x86_64/default/.config"
 
-# Incremental build RPM
-cd "$KERNEL_OBJ_DIR"
-yes "" | make oldconfig || true
-make -j$(nproc) rpm
+cd "$BUILD_OBJ_DIR"
+
+# Przygotowanie starego configu (incremental build)
+make -C "$KERNEL_SRC_DIR" O="$BUILD_OBJ_DIR" oldconfig || true
+
+# Budowa RPM
+make -C "$KERNEL_SRC_DIR" O="$BUILD_OBJ_DIR" -j$(nproc) rpm
 
 # Podpisywanie RPM
 echo "$GPG_PRIVATE_KEY" > /tmp/private.key
