@@ -22,7 +22,7 @@ jobs:
           docker run --rm -t \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
-            registry.opensuse.org/tumbleweed/opensuse:latest \
+            opensuse/tumbleweed \
             /bin/bash -c "
               set -e
 
