@@ -10,7 +10,11 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest  # runner hosta
+    container:
+      image: opensuse/tumbleweed
+      options: --user root  # żeby wszystko działało bez sudo
+
     env:
       GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
       GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
@@ -23,12 +27,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install build dependencies
+      - name: Install build dependencies (z repo Tumbleweed)
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential libncurses-dev bison flex libssl-dev libelf-dev \
-            dwarves ccache bc rpm gpg
+          zypper refresh
+          zypper install -y \
+            make gcc ncurses-devel bison flex openssl-devel elfutils-devel \
+            rpm-build ccache bc gpg perl wget gzip tar
 
       - name: Cache ccache
         uses: actions/cache@v3
@@ -66,7 +70,7 @@ jobs:
           cd linux-${KERNEL_VERSION}
           # Kompilacja kernela
           make -j"$(nproc)"
-          # Tworzenie paczek RPM bez podwójnej kompilacji
+          # Tworzenie paczek RPM
           make rpm-pkg \
             LOCALVERSION=${LOCALVERSION} \
             KDEB_PKGVERSION=${KERNEL_VERSION}-${KERNEL_RELEASE} \
