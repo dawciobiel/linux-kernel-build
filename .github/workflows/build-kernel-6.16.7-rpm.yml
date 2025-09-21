@@ -33,7 +33,7 @@ jobs:
           zypper install -y \
             make gcc ncurses-devel bison flex libopenssl-devel libelf-devel \
             rpm-build ccache bc gpg2 perl wget gzip tar fakeroot perl-Text-Template \
-            inetutils git
+            hostname git
 
       - name: Cache ccache
         uses: actions/cache@v3
@@ -79,10 +79,14 @@ jobs:
             rpmsign --addsign "$rpm"
           done
 
-      - name: List signed RPMs
+      - name: Debug signed RPMs
         run: |
+          echo "Signed RPMs in ~/rpmbuild/RPMS/x86_64/:"
           ls -lh ~/rpmbuild/RPMS/x86_64/
-          rpm -Kv ~/rpmbuild/RPMS/x86_64/*.rpm || true
+          for rpm in ~/rpmbuild/RPMS/x86_64/*.rpm; do
+            echo "RPM: $rpm"
+            rpm -Kv "$rpm" || true
+          done
 
       - name: Upload RPM artifacts
         uses: actions/upload-artifact@v4
