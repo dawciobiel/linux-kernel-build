@@ -2,9 +2,19 @@
 set -eux
 
 # -------------------------
-# Incremental kernel build script for x86_64
+# Incremental kernel build script
+# -------------------------
+# Użycie: ./build-kernel.sh <ścieżka_do_configu>
 # -------------------------
 
+CONFIG_PATH="$1"
+
+if [ -z "$CONFIG_PATH" ]; then
+    echo "Usage: $0 <config-file>"
+    exit 1
+fi
+
+# Katalog buildowy kernela
 KERNEL_OBJ_DIR=/usr/src/linux-6.16.7-1-obj
 
 # Dodawanie repozytoriów Tumbleweed jeśli brak
@@ -33,14 +43,14 @@ zypper -n in bc bison elfutils-devel flex gcc git make ncurses-devel perl rpm-bu
 
 # Kopiowanie customowego .config
 mkdir -p "$KERNEL_OBJ_DIR/x86_64/default"
-cp -u kernel-config/.config "$KERNEL_OBJ_DIR/x86_64/default/.config"
+cp -u "$CONFIG_PATH" "$KERNEL_OBJ_DIR/x86_64/default/.config"
 
 # Incremental build RPM
 cd "$KERNEL_OBJ_DIR"
 yes "" | make oldconfig || true
 make -j$(nproc) rpm
 
-# Import GPG key i podpisywanie RPM
+# Podpisywanie RPM
 echo "$GPG_PRIVATE_KEY" > /tmp/private.key
 gpg --batch --import /tmp/private.key
 
@@ -50,4 +60,4 @@ done
 
 rm -f /tmp/private.key
 
-echo "Incremental Kernel RPMs build complete"
+echo "Incremental Kernel RPMs build complete for $CONFIG_PATH"

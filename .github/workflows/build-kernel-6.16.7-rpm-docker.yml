@@ -18,14 +18,14 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /tmp/zypp-cache
-          key: zypper-cache-${{ hashFiles('kernel-config/.config') }}
+          key: zypper-cache-${{ hashFiles('kernel-config/6.16.7-1-default.custom/current') }}
           restore-keys: zypper-cache-
 
       - name: Cache kernel build directory
         uses: actions/cache@v4
         with:
           path: /usr/src/linux-6.16.7-1-obj
-          key: kernel-build-${{ hashFiles('kernel-config/.config') }}
+          key: kernel-build-${{ hashFiles('kernel-config/6.16.7-1-default.custom/current') }}
           restore-keys: kernel-build-
 
       - name: Run incremental kernel build inside Docker
@@ -38,7 +38,7 @@ jobs:
             -v /tmp/zypp-cache:/var/cache/zypp \
             -w /workspace \
             opensuse/tumbleweed \
-            /workspace/build-kernel.sh
+            /workspace/build-kernel.sh kernel-config/6.16.7-1-default.custom/current
 
       - name: Upload kernel RPMs
         uses: actions/upload-artifact@v4
