@@ -1,17 +1,24 @@
-name: Build Custom Kernel 6.16.7 RPM
+name: Build & Sign Custom Linux Kernel 6.16.7 RPMs
 
 on:
+  push:
+    branches: [ main ]
   workflow_dispatch:
 
 env:
   KERNEL_VERSION: 6.16.7
+  KERNEL_RELEASE: 1
+  LOCALVERSION: -custom
 
 jobs:
-  build:
+  build-kernel:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Install dependencies
@@ -19,22 +26,69 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             build-essential libncurses-dev bison flex libssl-dev libelf-dev \
-            fakeroot dpkg-dev rpm wget xz-utils
+            rpm curl bc ccache git dwarves gnupg
 
-      - name: Download kernel sources
+      - name: Cache ccache
+        uses: actions/cache@v3
+        with:
+          path: ~/.ccache
+          key: ${{ runner.os }}-ccache-${{ hashFiles('**/Makefile') }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-
+
+      - name: Import GPG key
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
-          wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${KERNEL_VERSION}.tar.xz
+          echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+          echo "default-key $(gpg --list-keys --with-colons | awk -F: '/^pub/{print $5}')" > ~/.rpmmacros
+          echo "%_signature gpg" >> ~/.rpmmacros
+          echo "%_gpg_name $(gpg --list-keys --with-colons | awk -F: '/^pub/{print $5}')" >> ~/.rpmmacros
+          echo "%_gpg_path ~/.gnupg" >> ~/.rpmmacros
+          echo "%_gpgbin /usr/bin/gpg" >> ~/.rpmmacros
+
+      - name: Download Linux Kernel
+        run: |
+          curl -LO https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${KERNEL_VERSION}.tar.xz
           tar -xf linux-${KERNEL_VERSION}.tar.xz
 
-      - name: Build kernel RPMs
+      - name: Prepare .config
+        run: |
+          cd linux-${KERNEL_VERSION}
+          make defconfig
+
+      - name: Clean old build artifacts
+        run: |
+          cd linux-${KERNEL_VERSION}
+          make mrproper || true
+          rm -rf ~/rpmbuild/RPMS/x86_64/*.rpm || true
+
+      - name: Build RPMs
         run: |
           cd linux-${KERNEL_VERSION}
           make -j$(nproc) binrpm-pkg \
-            LOCALVERSION=-custom \
-            RPMOPTS="--define 'dist .custom'"
+            LOCALVERSION=${LOCALVERSION} \
+            KDEB_PKGVERSION=${KERNEL_VERSION}-${KERNEL_RELEASE} \
+            RPMOPTS="--define 'dist .custom' --define '_rpmdir $HOME/rpmbuild/RPMS/x86_64' --sign"
 
-      - name: Upload kernel RPMs
+      - name: Verify kernel version
+        run: |
+          cd linux-${KERNEL_VERSION}
+          echo "Kernel release from include/config/kernel.release:" > $HOME/kernel-version-info.txt
+          cat include/config/kernel.release >> $HOME/kernel-version-info.txt
+          echo "Kernel version from Makefile:" >> $HOME/kernel-version-info.txt
+          grep 'VERSION\|PATCHLEVEL\|SUBLEVEL\|EXTRAVERSION' Makefile >> $HOME/kernel-version-info.txt
+          cat $HOME/kernel-version-info.txt
+
+      - name: List signed RPMs
+        run: |
+          rpm -Kv ~/rpmbuild/RPMS/x86_64/*.rpm
+
+      - name: Upload RPMs and version info as Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: kernel-rpms
-          path: ~/rpmbuild/RPMS/x86_64/*.rpm
+          path: |
+            ~/rpmbuild/RPMS/x86_64/*.rpm
+            $HOME/kernel-version-info.txt
