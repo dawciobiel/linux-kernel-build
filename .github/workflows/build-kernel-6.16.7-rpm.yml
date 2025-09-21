@@ -32,7 +32,7 @@ jobs:
           zypper refresh
           zypper install -y \
             make gcc ncurses-devel bison flex libopenssl-devel libelf-devel \
-            rpm-build ccache bc gpg2 perl wget gzip tar
+            rpm-build ccache bc gpg2 perl wget gzip tar fakeroot perl-Text-Template
 
       - name: Cache ccache
         uses: actions/cache@v3
@@ -67,8 +67,8 @@ jobs:
       - name: Build kernel and create RPM
         run: |
           cd linux-${KERNEL_VERSION}
-          make -j"$(nproc)"
-          make rpm-pkg \
+          # Build kernel i paczki RPM w jednym kroku, ograniczamy do 4 wątków
+          make -j4 rpm-pkg \
             LOCALVERSION=${LOCALVERSION} \
             KDEB_PKGVERSION=${KERNEL_VERSION}-${KERNEL_RELEASE} \
             RPMOPTS="--define 'dist .custom' --define '_rpmdir $HOME/rpmbuild/RPMS/x86_64'"
