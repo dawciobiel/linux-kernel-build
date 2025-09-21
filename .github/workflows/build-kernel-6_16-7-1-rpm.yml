@@ -1,61 +1,40 @@
-name: Build Custom Kernel 6.16.7 RPMs
+name: Build Custom Kernel 6.16.7 RPM
 
 on:
-  push:
-    branches: [ main ]
   workflow_dispatch:
 
 env:
   KERNEL_VERSION: 6.16.7
-  KERNEL_RELEASE: 1
 
 jobs:
-  build-kernel:
+  build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
+
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install build dependencies
+      - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             build-essential libncurses-dev bison flex libssl-dev libelf-dev \
-            rpm curl bc ccache git dwarves libtool autoconf
+            fakeroot dpkg-dev rpm wget xz-utils
 
-      - name: Cache ccache
-        uses: actions/cache@v3
-        with:
-          path: ~/.ccache
-          key: ${{ runner.os }}-ccache-${{ hashFiles('**/Makefile') }}
-          restore-keys: |
-            ${{ runner.os }}-ccache-
-
-      - name: Download Linux Kernel 6.16.7
+      - name: Download kernel sources
         run: |
-          curl -LO https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${KERNEL_VERSION}.tar.xz
+          wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${KERNEL_VERSION}.tar.xz
           tar -xf linux-${KERNEL_VERSION}.tar.xz
-
-      - name: Prepare .config
-        run: |
-          cd linux-${KERNEL_VERSION}
-          # Możesz wgrać własny config:
-          # cp ../custom.config .config
-          make defconfig
 
       - name: Build kernel RPMs
         run: |
           cd linux-${KERNEL_VERSION}
-          # Podanie release = 1, żeby RPM-y były 6.16.7-1
-          make -j$(nproc) rpm-pkg \
+          make -j$(nproc) binrpm-pkg \
             LOCALVERSION=-custom \
             RPMOPTS="--define 'dist .custom'"
 
-      - name: Upload kernel RPMs as artifacts
+      - name: Upload kernel RPMs
         uses: actions/upload-artifact@v4
         with:
           name: kernel-rpms
-          path: linux-${{ env.KERNEL_VERSION }}/rpmbuild/RPMS/x86_64/*.rpm
+          path: ~/rpmbuild/RPMS/x86_64/*.rpm
