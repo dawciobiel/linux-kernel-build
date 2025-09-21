@@ -1,4 +1,4 @@
-name: Build & Sign Custom Linux Kernel 6.16.7 RPMs
+name: Build & Sign Custom Kernel 6.16.7 RPMs
 
 on:
   push:
