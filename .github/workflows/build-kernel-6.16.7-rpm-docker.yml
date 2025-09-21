@@ -8,7 +8,7 @@ on:
 
 jobs:
   build-kernel:
-    runs-on: ubuntu-latest  # host tylko do uruchomienia Dockera
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
@@ -26,9 +26,17 @@ jobs:
             /bin/bash -c "
               set -e
 
-              echo 'Updating system and installing build tools...'
-              zypper -n ref
-              zypper -n in -t pattern devel_basis rpm-build make gcc bc perl bison flex elfutils-devel ncurses-devel git wget rpm-sign
+              echo 'Adding standard Tumbleweed repositories...'
+              zypper ar -f http://download.opensuse.org/tumbleweed/repo/oss/ repo-oss
+              zypper ar -f http://download.opensuse.org/tumbleweed/repo/non-oss/ repo-non-oss
+              zypper ar -f http://download.opensuse.org/update/tumbleweed/ repo-update
+
+              echo 'Refreshing repositories...'
+              zypper ref
+
+              echo 'Installing build tools...'
+              zypper -n in -t pattern devel_basis
+              zypper -n in bc bison elfutils-devel flex gcc git make ncurses-devel perl rpm-build rpm-sign wget
 
               echo 'Copying custom kernel config...'
               mkdir -p /usr/src/linux-6.16.7-1-obj/x86_64/default
