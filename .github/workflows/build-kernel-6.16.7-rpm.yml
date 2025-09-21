@@ -34,7 +34,7 @@ jobs:
             make gcc ncurses-devel bison flex libopenssl-devel libelf-devel \
             rpm-build ccache bc gpg2 perl wget gzip tar fakeroot perl-Text-Template \
             hostname git \
-            elfutils-devel dwarves python3 rsync
+            libdw-devel dwarves python3-base rsync
 
       - name: Cache ccache
         uses: actions/cache@v3
