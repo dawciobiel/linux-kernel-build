@@ -33,7 +33,8 @@ jobs:
           zypper install -y \
             make gcc ncurses-devel bison flex libopenssl-devel libelf-devel \
             rpm-build ccache bc gpg2 perl wget gzip tar fakeroot perl-Text-Template \
-            hostname git
+            hostname git \
+            elfutils-devel dwarves python3 rsync
 
       - name: Cache ccache
         uses: actions/cache@v3
@@ -54,6 +55,12 @@ jobs:
           echo "%_gpgbin /usr/bin/gpg" >> ~/.rpmmacros
           echo "%__gpg_sign_cmd %{__gpg} gpg --batch --no-tty --pinentry-mode loopback --passphrase ${GPG_PASSPHRASE} --no-armor --detach-sign --sign --local-user %{_gpg_name} %{__plaintext_filename} > %{__signature_filename}" >> ~/.rpmmacros
 
+      - name: Set build limits
+        run: |
+          ulimit -v 8000000
+          export MAKEFLAGS="-j4"
+          echo "Build limits set: max virtual memory 8GB, MAKEFLAGS=$MAKEFLAGS"
+
       - name: Clone Linux Kernel from git
         run: |
           git clone --branch v${KERNEL_VERSION} --depth 1 https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git linux-${KERNEL_VERSION}
@@ -67,8 +74,7 @@ jobs:
       - name: Build kernel and create RPM
         run: |
           cd linux-${KERNEL_VERSION}
-          # Build kernel i paczki RPM w jednym kroku, ograniczamy do 4 wątków
-          make -j4 rpm-pkg \
+          make rpm-pkg \
             LOCALVERSION=${LOCALVERSION} \
             KDEB_PKGVERSION=${KERNEL_VERSION}-${KERNEL_RELEASE} \
             RPMOPTS="--define 'dist .custom' --define '_rpmdir $HOME/rpmbuild/RPMS/x86_64'"
