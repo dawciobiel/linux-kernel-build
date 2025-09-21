@@ -1,4 +1,4 @@
-name: Build Linux 6.12 RPMs
+name: Build Kernel 6.12 RPMs
 
 on:
   push:
