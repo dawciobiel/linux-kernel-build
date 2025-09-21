@@ -16,100 +16,111 @@ jobs:
     env:
       GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
       GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+
     defaults:
       run:
         shell: bash
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential libncurses-dev bison flex libssl-dev libelf-dev \
-            rpm curl bc ccache git dwarves gnupg
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential libncurses-dev bison flex libssl-dev libelf-dev \
+          rpm rpm2cpio curl bc ccache git dwarves gnupg
 
-      - name: Cache ccache
-        uses: actions/cache@v3
-        with:
-          path: ~/.ccache
-          key: ${{ runner.os }}-ccache-${{ hashFiles('**/Makefile') }}
-          restore-keys: |
-            ${{ runner.os }}-ccache-
+    - name: Cache ccache
+      uses: actions/cache@v3
+      with:
+        path: ~/.ccache
+        key: ${{ runner.os }}-ccache-${{ hashFiles('**/Makefile') }}
+        restore-keys: |
+          ${{ runner.os }}-ccache-
 
-      - name: Import GPG key and setup .rpmmacros
-        run: |
-          echo "$GPG_PRIVATE_KEY" | gpg --batch --import
-          echo "default-key $(gpg --list-keys --with-colons | awk -F: '/^pub/{print $5}')" > ~/.rpmmacros
-          echo "%_signature gpg" >> ~/.rpmmacros
-          echo "%_gpg_name $(gpg --list-keys --with-colons | awk -F: '/^pub/{print $5}')" >> ~/.rpmmacros
-          echo "%_gpg_path ~/.gnupg" >> ~/.rpmmacros
-          echo "%_gpgbin /usr/bin/gpg" >> ~/.rpmmacros
+    - name: Import GPG key and setup .rpmmacros
+      run: |
+        echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+        KEY_ID=$(gpg --list-keys --with-colons | awk -F: '/^pub/{print $5; exit}')
+        echo "default-key $KEY_ID" > ~/.rpmmacros
+        echo "%_signature gpg" >> ~/.rpmmacros
+        echo "%_gpg_name $KEY_ID" >> ~/.rpmmacros
+        echo "%_gpg_path ~/.gnupg" >> ~/.rpmmacros
+        echo "%_gpgbin /usr/bin/gpg" >> ~/.rpmmacros
+        # custom command z obsługą hasła (loopback mode)
+        echo "%__gpg_sign_cmd %{__gpg} gpg --batch --no-tty --pinentry-mode loopback --passphrase ${GPG_PASSPHRASE} --no-armor --detach-sign --sign --local-user %{_gpg_name} %{__plaintext_filename} > %{__signature_filename}" >> ~/.rpmmacros
 
-      - name: Download Linux Kernel
-        run: |
-          curl -LO https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${KERNEL_VERSION}.tar.xz
-          tar -xf linux-${KERNEL_VERSION}.tar.xz
+    - name: Download Linux Kernel
+      run: |
+        curl -LO https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${KERNEL_VERSION}.tar.xz
+        tar -xf linux-${KERNEL_VERSION}.tar.xz
 
-      - name: Clean old build artifacts
-        run: |
-          cd linux-${KERNEL_VERSION}
-          make mrproper || true
-          rm -rf ~/rpmbuild/RPMS/x86_64/*.rpm || true
+    - name: Clean old build artifacts
+      run: |
+        cd linux-${KERNEL_VERSION}
+        make mrproper || true
+        rm -rf ~/rpmbuild/RPMS/x86_64/*.rpm || true
 
-      - name: Prepare custom .config
-        run: |
-          cd linux-${KERNEL_VERSION}
-          cp $GITHUB_WORKSPACE/kernel-config/6.16.7-1-default.custom/current .config
-          make olddefconfig
+    - name: Prepare custom .config
+      run: |
+        cd linux-${KERNEL_VERSION}
+        cp $GITHUB_WORKSPACE/kernel-config/6.16.7-1-default.custom/current .config
+        make olddefconfig
 
-      - name: Debug custom .config
-        run: |
-          cd linux-${KERNEL_VERSION}
-          echo "Checking .config exists:"
-          if [ -f .config ]; then
-            echo ".config found"
-          else
-            echo ".config NOT found"
-            exit 1
-          fi
-          echo "Showing some key options from .config:"
-          grep 'CONFIG_LOCALVERSION\|CONFIG_DEBUG_INFO\|CONFIG_MODULES' .config || true
+    - name: Debug custom .config
+      run: |
+        cd linux-${KERNEL_VERSION}
+        echo "Checking .config exists:"
+        if [ -f .config ]; then
+          echo ".config found"
+        else
+          echo ".config NOT found"
+          exit 1
+        fi
+        echo "Showing some key options from .config:"
+        grep 'CONFIG_LOCALVERSION\|CONFIG_DEBUG_INFO\|CONFIG_MODULES' .config || true
 
-      - name: Debug GPG key for RPM signing
-        run: |
-          echo "Listing imported GPG keys:"
-          gpg --list-keys
-          echo "Default key for RPM signing (from .rpmmacros):"
-          grep '^default-key' ~/.rpmmacros
+    - name: Debug GPG key for RPM signing
+      run: |
+        echo "Listing imported GPG keys:"
+        gpg --list-keys
+        echo "Default key for RPM signing (from .rpmmacros):"
+        grep '^default-key' ~/.rpmmacros
 
-      - name: Build RPMs
-        run: |
-          cd linux-${KERNEL_VERSION}
-          make -j$(nproc) binrpm-pkg \
-            LOCALVERSION=${LOCALVERSION} \
-            KDEB_PKGVERSION=${KERNEL_VERSION}-${KERNEL_RELEASE} \
-            RPMOPTS="--define 'dist .custom' --define '_rpmdir $HOME/rpmbuild/RPMS/x86_64' --sign"
+    - name: Build RPMs (without --sign)
+      run: |
+        cd linux-${KERNEL_VERSION}
+        make -j$(nproc) binrpm-pkg \
+          LOCALVERSION=${LOCALVERSION} \
+          KDEB_PKGVERSION=${KERNEL_VERSION}-${KERNEL_RELEASE} \
+          RPMOPTS="--define 'dist .custom' --define '_rpmdir $HOME/rpmbuild/RPMS/x86_64'"
 
-      - name: Verify kernel version
-        run: |
-          cd linux-${KERNEL_VERSION}
-          echo "Kernel release from include/config/kernel.release:" > $HOME/kernel-version-info.txt
-          cat include/config/kernel.release >> $HOME/kernel-version-info.txt
-          echo "Kernel version from Makefile:" >> $HOME/kernel-version-info.txt
-          grep 'VERSION\|PATCHLEVEL\|SUBLEVEL\|EXTRAVERSION' Makefile >> $HOME/kernel-version-info.txt
-          cat $HOME/kernel-version-info.txt
+    - name: Sign built RPMs with rpmsign
+      run: |
+        for rpm in ~/rpmbuild/RPMS/x86_64/*.rpm; do
+          echo "Signing $rpm"
+          rpmsign --addsign $rpm
+        done
 
-      - name: List signed RPMs
-        run: |
-          rpm -Kv ~/rpmbuild/RPMS/x86_64/*.rpm
+    - name: Verify kernel version
+      run: |
+        cd linux-${KERNEL_VERSION}
+        echo "Kernel release from include/config/kernel.release:" > $HOME/kernel-version-info.txt
+        cat include/config/kernel.release >> $HOME/kernel-version-info.txt
+        echo "Kernel version from Makefile:" >> $HOME/kernel-version-info.txt
+        grep 'VERSION\|PATCHLEVEL\|SUBLEVEL\|EXTRAVERSION' Makefile >> $HOME/kernel-version-info.txt
+        cat $HOME/kernel-version-info.txt
 
-      - name: Upload RPMs and version info as Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: kernel-rpms
-          path: |
-            ~/rpmbuild/RPMS/x86_64/*.rpm
-            $HOME/kernel-version-info.txt
+    - name: List signed RPMs
+      run: |
+        rpm -Kv ~/rpmbuild/RPMS/x86_64/*.rpm || true
+
+    - name: Upload RPMs and version info as Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: kernel-rpms
+        path: |
+          ~/rpmbuild/RPMS/x86_64/*.rpm
+          $HOME/kernel-version-info.txt
