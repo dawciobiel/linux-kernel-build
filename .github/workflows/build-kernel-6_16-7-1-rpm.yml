@@ -62,7 +62,7 @@ jobs:
       - name: Prepare custom .config
         run: |
           cd linux-${KERNEL_VERSION}
-          cp $GITHUB_WORKSPACE/kernel-config/custom_config .config
+          cp $GITHUB_WORKSPACE/kernel-config/6.16.7-1-default.custom/current .config
           make olddefconfig
 
       - name: Debug custom .config
