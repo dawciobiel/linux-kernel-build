@@ -1,4 +1,4 @@
-name: Build Custom Kernel RPM (Docker + Incremental)
+name: Build Custom Kernel RPM
 
 on:
   push:
@@ -20,13 +20,6 @@ jobs:
           path: /tmp/zypp-cache
           key: zypper-cache-${{ hashFiles('kernel-config/6.16.7-1-default.custom/current') }}
           restore-keys: zypper-cache-
-
-      - name: Cache kernel build directory
-        uses: actions/cache@v4
-        with:
-          path: /usr/src/linux-6.16.7-1-obj
-          key: kernel-build-${{ hashFiles('kernel-config/6.16.7-1-default.custom/current') }}
-          restore-keys: kernel-build-
 
       - name: Run kernel RPM build inside Docker
         env:

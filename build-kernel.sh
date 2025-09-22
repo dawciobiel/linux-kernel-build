@@ -1,11 +1,6 @@
 #!/bin/bash
 set -eux
 
-# -------------------------
-# Kernel RPM build script for Tumbleweed Docker
-# Usage: ./build-kernel.sh <ścieżka_do_configu>
-# -------------------------
-
 CONFIG_PATH="$1"
 
 if [ -z "$CONFIG_PATH" ]; then
@@ -13,52 +8,34 @@ if [ -z "$CONFIG_PATH" ]; then
     exit 1
 fi
 
-# katalog źródeł kernela
 KERNEL_SRC_DIR=/usr/src/linux-6.16.7-1
-
-# Dodawanie repozytoriów Tumbleweed jeśli brak
-for repo in repo-oss repo-non-oss repo-update; do
-    if ! zypper lr | grep -q "$repo"; then
-        case $repo in
-            repo-oss)
-                zypper ar -f http://download.opensuse.org/tumbleweed/repo/oss/ $repo
-                ;;
-            repo-non-oss)
-                zypper ar -f http://download.opensuse.org/tumbleweed/repo/non-oss/ $repo
-                ;;
-            repo-update)
-                zypper ar -f http://download.opensuse.org/update/tumbleweed/ $repo
-                ;;
-        esac
-    fi
-done
-
-# Odświeżanie repo
-zypper ref
-
-# Instalacja pakietów potrzebnych do builda kernela
-zypper -n in -t pattern devel_basis
-zypper -n in bc bison flex gcc git make ncurses-devel perl rpm-build wget libelf-devel kernel-source kernel-devel
-
-# katalog buildowy (incremental build)
 BUILD_OBJ_DIR=/usr/src/linux-6.16.7-1-obj
-mkdir -p "$BUILD_OBJ_DIR/x86_64/default"
-cp -u "$CONFIG_PATH" "$BUILD_OBJ_DIR/x86_64/default/.config"
-
-# nieinteraktywny build configu
-make -C "$KERNEL_SRC_DIR" O="$BUILD_OBJ_DIR" olddefconfig
-
-# przygotowanie katalogów rpmbuild
 RPMBUILD_DIR=/usr/src/packages
+
+# Przygotowanie katalogów buildowych i rpmbuild
+mkdir -p "$BUILD_OBJ_DIR/x86_64/default"
 mkdir -p $RPMBUILD_DIR/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
 
-# kopiowanie custom config do SOURCES
+# Kopiujemy config do katalogu buildowego
+cp "$CONFIG_PATH" "$BUILD_OBJ_DIR/x86_64/default/.config"
+
+# Pobieramy oficjalny kernel.spec z OBS
+wget -O $RPMBUILD_DIR/SPECS/kernel.spec \
+     https://build.opensuse.org/package/view_file/openSUSE:Factory:Kernel/linux/kernel.spec
+
+# Opcjonalnie można zmienić w spec file BUILDOBJ_DIR, ale w większości działa tak jak jest
+
+# Kopiujemy config do SOURCES, aby rpmbuild mógł go wykorzystać
 cp "$CONFIG_PATH" $RPMBUILD_DIR/SOURCES/.config
 
-# build RPM
-rpmbuild -bb --define "_topdir $RPMBUILD_DIR" --with baseonly $KERNEL_SRC_DIR/kernel.spec
+# Instalacja paczek potrzebnych do builda kernela w Dockerze
+zypper -n in -t pattern devel_basis
+zypper -n in bc bison flex gcc git make ncurses-devel perl rpm-build wget libelf-devel kernel-devel
 
-# podpisanie RPM
+# Build RPM
+rpmbuild -bb --define "_topdir $RPMBUILD_DIR" --with baseonly $RPMBUILD_DIR/SPECS/kernel.spec
+
+# Podpisanie RPM
 echo "$GPG_PRIVATE_KEY" > /tmp/private.key
 gpg --batch --import /tmp/private.key
 
@@ -68,4 +45,4 @@ done
 
 rm -f /tmp/private.key
 
-echo "Kernel RPM build complete for $CONFIG_PATH"
+echo "Kernel RPM build complete. RPMs available in $RPMBUILD_DIR/RPMS/x86_64/"
