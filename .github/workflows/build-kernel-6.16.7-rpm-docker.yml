@@ -28,7 +28,7 @@ jobs:
           key: kernel-build-${{ hashFiles('kernel-config/6.16.7-1-default.custom/current') }}
           restore-keys: kernel-build-
 
-      - name: Run incremental kernel build inside Docker
+      - name: Run kernel RPM build inside Docker
         env:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
@@ -44,4 +44,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: kernel-rpms
-          path: kernel-config/x86_64/RPMS/*.rpm
+          path: /usr/src/packages/RPMS/x86_64/*.rpm

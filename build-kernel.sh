@@ -2,7 +2,7 @@
 set -eux
 
 # -------------------------
-# Incremental kernel build script for Tumbleweed Docker
+# Kernel RPM build script for Tumbleweed Docker
 # Usage: ./build-kernel.sh <ścieżka_do_configu>
 # -------------------------
 
@@ -40,27 +40,32 @@ zypper ref
 zypper -n in -t pattern devel_basis
 zypper -n in bc bison flex gcc git make ncurses-devel perl rpm-build wget libelf-devel kernel-source kernel-devel
 
-# Tworzymy katalog buildowy i kopiujemy config
+# katalog buildowy (incremental build)
 BUILD_OBJ_DIR=/usr/src/linux-6.16.7-1-obj
 mkdir -p "$BUILD_OBJ_DIR/x86_64/default"
 cp -u "$CONFIG_PATH" "$BUILD_OBJ_DIR/x86_64/default/.config"
 
-cd "$BUILD_OBJ_DIR"
-
-# Nieinteraktywny build configu
+# nieinteraktywny build configu
 make -C "$KERNEL_SRC_DIR" O="$BUILD_OBJ_DIR" olddefconfig
 
-# Budowa RPM
-make -C "$KERNEL_SRC_DIR" O="$BUILD_OBJ_DIR" -j$(nproc) rpm
+# przygotowanie katalogów rpmbuild
+RPMBUILD_DIR=/usr/src/packages
+mkdir -p $RPMBUILD_DIR/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
 
-# Podpisywanie RPM
+# kopiowanie custom config do SOURCES
+cp "$CONFIG_PATH" $RPMBUILD_DIR/SOURCES/.config
+
+# build RPM
+rpmbuild -bb --define "_topdir $RPMBUILD_DIR" --with baseonly $KERNEL_SRC_DIR/kernel.spec
+
+# podpisanie RPM
 echo "$GPG_PRIVATE_KEY" > /tmp/private.key
 gpg --batch --import /tmp/private.key
 
-for rpm in x86_64/RPMS/*.rpm; do
+for rpm in $RPMBUILD_DIR/RPMS/x86_64/*.rpm; do
     rpmsign --addsign --passphrase "$GPG_PASSPHRASE" "$rpm"
 done
 
 rm -f /tmp/private.key
 
-echo "Incremental Kernel RPMs build complete for $CONFIG_PATH"
+echo "Kernel RPM build complete for $CONFIG_PATH"
