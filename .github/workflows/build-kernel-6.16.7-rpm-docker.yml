@@ -1,48 +1,30 @@
-name: Build Custom Kernel RPM
+name: Build Kernel 6.16.7 RPM
 
 on:
   workflow_dispatch:
-    inputs:
-      kernel_config:
-        description: 'Path to kernel .config file in repo'
-        required: true
-        default: 'kernel-config/6.16.7-1-default.custom/current'
 
 jobs:
-  build-kernel:
+  build:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Cache zypper packages
-        uses: actions/cache@v4
-        with:
-          path: /tmp/zypp-cache
-          key: zypper-cache-${{ github.event.inputs.kernel_config }}
-          restore-keys: zypper-cache-
+      - name: Set up Docker cache dir
+        run: mkdir -p /tmp/zypp-cache
 
-      - name: Build kernel inside Docker
-        env:
-          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
-          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+      - name: Build Kernel RPM in Docker
         run: |
           docker run --rm -t \
             -v ${{ github.workspace }}:/workspace \
             -v /tmp/zypp-cache:/var/cache/zypp \
             -w /workspace \
             opensuse/tumbleweed \
-            /workspace/build-kernel.sh "${{ github.event.inputs.kernel_config }}"
+            /workspace/build-kernel.sh kernel-config/6.16.7-1-default.custom/current
 
-      - name: Upload kernel RPMs
+      - name: Upload RPM artifacts
         uses: actions/upload-artifact@v4
         with:
           name: kernel-rpms
-          path: /usr/src/packages/RPMS/x86_64/*.rpm
-
-      - name: Upload build logs
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-logs
-          path: /workspace/build.log
+          path: /usr/src/packages/RPMS/**/*.rpm

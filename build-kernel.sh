@@ -1,51 +1,48 @@
 #!/bin/bash
-set -eux
-
-# -------------------------
-# Kernel RPM build script for Tumbleweed Docker
-# Usage: ./build-kernel.sh <ścieżka_do_configu>
-# -------------------------
+set -euo pipefail
 
 CONFIG_PATH="$1"
 
 if [ -z "$CONFIG_PATH" ]; then
-    echo "Usage: $0 <config-file>"
-    exit 1
+  echo "Usage: $0 <path-to-kernel-config>"
+  exit 1
 fi
 
-KERNEL_SRC_DIR=/usr/src/linux-6.16.7-1
-BUILD_OBJ_DIR=/usr/src/linux-6.16.7-1-obj
-RPMBUILD_DIR=/usr/src/packages
+# Paths
+KERNEL_SRC_DIR="/usr/src/linux-6.16.7-1"
+BUILD_OBJ_DIR="/usr/src/linux-6.16.7-1-obj"
+RPMBUILD_DIR="/usr/src/packages"
 
-# Przygotowanie katalogów buildowych i rpmbuild
+# Install required tools
+zypper -n in --no-recommends \
+  bc bison flex gcc git make ncurses-devel perl \
+  rpm-build wget kernel-source
+
+# Prepare directories
 mkdir -p "$BUILD_OBJ_DIR/x86_64/default"
-mkdir -p $RPMBUILD_DIR/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+mkdir -p "$RPMBUILD_DIR/BUILD" "$RPMBUILD_DIR/RPMS" "$RPMBUILD_DIR/SOURCES" "$RPMBUILD_DIR/SPECS" "$RPMBUILD_DIR/SRPMS"
 
-# Kopiowanie custom config do katalogu buildowego
-cp "$CONFIG_PATH" "$BUILD_OBJ_DIR/x86_64/default/.config"
+# Copy config
+cp -u "$CONFIG_PATH" "$BUILD_OBJ_DIR/x86_64/default/.config"
 
-# Instalacja pakietów potrzebnych do builda kernela w Dockerze
-zypper -n in -t pattern devel_basis
-zypper -n in bc bison flex gcc git make ncurses-devel perl rpm-build libelf-devel kernel-devel wget
+# Prepare kernel config
+make -C "$KERNEL_SRC_DIR" O="$BUILD_OBJ_DIR" olddefconfig
 
-# Pobranie kernel.spec bezpośrednio z OBS openSUSE
-wget -O "$RPMBUILD_DIR/SPECS/kernel.spec" \
-  https://build.opensuse.org/projects/openSUSE:Factory:Kernel/packages/linux/files/kernel.spec
+# Locate kernel.spec from kernel-source
+KERNEL_SPEC=$(rpm -ql kernel-source | grep 'kernel.spec$' | head -n1)
 
-# Kopiowanie custom config do SOURCES rpmbuild
-cp "$CONFIG_PATH" $RPMBUILD_DIR/SOURCES/.config
+if [ -z "$KERNEL_SPEC" ]; then
+  echo "ERROR: kernel.spec not found in kernel-source package"
+  exit 1
+fi
 
-# Build RPM kernela
-rpmbuild -bb --define "_topdir $RPMBUILD_DIR" --with baseonly $RPMBUILD_DIR/SPECS/kernel.spec
+# Copy spec to rpmbuild tree
+cp "$KERNEL_SPEC" "$RPMBUILD_DIR/SPECS/kernel.spec"
 
-# Podpisanie RPM
-echo "$GPG_PRIVATE_KEY" > /tmp/private.key
-gpg --batch --import /tmp/private.key
+# Copy .config to SOURCES (needed by rpmbuild)
+cp "$CONFIG_PATH" "$RPMBUILD_DIR/SOURCES/.config"
 
-for rpm in $RPMBUILD_DIR/RPMS/x86_64/*.rpm; do
-    rpmsign --addsign --passphrase "$GPG_PASSPHRASE" "$rpm"
-done
+# Build RPMs
+rpmbuild -bb --define "_topdir $RPMBUILD_DIR" --with baseonly "$RPMBUILD_DIR/SPECS/kernel.spec"
 
-rm -f /tmp/private.key
-
-echo "Kernel RPM build complete. RPMs available in $RPMBUILD_DIR/RPMS/x86_64/"
+echo "✅ Kernel RPM build finished. Find packages in: $RPMBUILD_DIR/RPMS/"
