@@ -21,17 +21,18 @@ RPMBUILD_DIR=/usr/src/packages
 mkdir -p "$BUILD_OBJ_DIR/x86_64/default"
 mkdir -p $RPMBUILD_DIR/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
 
-# Kopiujemy config do katalogu buildowego
+# Kopiowanie custom config do katalogu buildowego
 cp "$CONFIG_PATH" "$BUILD_OBJ_DIR/x86_64/default/.config"
 
 # Instalacja pakietów potrzebnych do builda kernela w Dockerze
 zypper -n in -t pattern devel_basis
-zypper -n in bc bison flex gcc git make ncurses-devel perl rpm-build libelf-devel kernel-devel kernel-source
+zypper -n in bc bison flex gcc git make ncurses-devel perl rpm-build libelf-devel kernel-devel kernel-source wget
 
-# Skopiowanie kernel.spec z zainstalowanego kernel-source
-cp /usr/src/packages/SPECS/kernel.spec $RPMBUILD_DIR/SPECS/kernel.spec
+# Skopiowanie kernel.spec z pakietu kernel-source do katalogu SPECS rpmbuild
+KERNEL_SPEC_SRC=$(rpm -ql kernel-source | grep 'kernel.spec$' | head -n1)
+cp "$KERNEL_SPEC_SRC" "$RPMBUILD_DIR/SPECS/kernel.spec"
 
-# Kopiowanie custom config do SOURCES
+# Kopiowanie custom config do SOURCES rpmbuild
 cp "$CONFIG_PATH" $RPMBUILD_DIR/SOURCES/.config
 
 # Build RPM kernela
