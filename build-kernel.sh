@@ -1,63 +1,72 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
-# === Variables ===
-CONFIG_PATH="${1:-kernel-config/6.16.7-1-default.custom/current}"
+CONFIG_PATH="${1:-}"
 KERNEL_VERSION="6.16.7"
-KERNEL_SRC_DIR="/usr/src/linux-$KERNEL_VERSION"
-BUILD_OBJ_DIR="/usr/src/linux-$KERNEL_VERSION-obj"
+KERNEL_SRC_DIR="/usr/src/linux-${KERNEL_VERSION}"
+BUILD_OBJ_DIR="/usr/src/linux-${KERNEL_VERSION}-obj"
 RPMBUILD_DIR="/usr/src/packages"
+ARCH="x86_64"
 
-# === Install dependencies ===
-zypper -n ref
-zypper -n in -t pattern devel_C_C++ \
-    bc bison flex gcc make ncurses-devel perl rpm-build wget
+echo ">>> Installing build dependencies..."
+zypper --non-interactive ar -f http://download.opensuse.org/tumbleweed/repo/oss/ repo-oss || true
+zypper --non-interactive ar -f http://download.opensuse.org/tumbleweed/repo/non-oss/ repo-non-oss || true
+zypper --non-interactive ar -f http://download.opensuse.org/update/tumbleweed/ repo-update || true
+zypper --non-interactive ref
 
-# === Download kernel sources if not exists ===
-if [ ! -f "$KERNEL_VERSION.tar.xz" ]; then
-    wget -O "linux-$KERNEL_VERSION.tar.xz" "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-$KERNEL_VERSION.tar.xz"
+zypper --non-interactive in \
+  bc bison flex gcc make ncurses-devel perl rpm-build wget
+
+echo ">>> Downloading kernel sources..."
+if [ ! -f "linux-${KERNEL_VERSION}.tar.xz" ]; then
+    wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${KERNEL_VERSION}.tar.xz
 fi
 
-# === Extract sources ===
-mkdir -p "$KERNEL_SRC_DIR"
-tar -xf "linux-$KERNEL_VERSION.tar.xz" -C /usr/src
-mv /usr/src/linux-$KERNEL_VERSION "$KERNEL_SRC_DIR" || true
+echo ">>> Extracting kernel sources..."
+rm -rf "${KERNEL_SRC_DIR}" "${BUILD_OBJ_DIR}"
+tar -xf linux-${KERNEL_VERSION}.tar.xz
+mkdir -p "${BUILD_OBJ_DIR}/${ARCH}/default"
 
-# === Prepare build directories ===
-mkdir -p "$BUILD_OBJ_DIR/x86_64/default"
-cp -u "$CONFIG_PATH" "$BUILD_OBJ_DIR/x86_64/default/.config"
+echo ">>> Copying kernel config..."
+if [ ! -f "${CONFIG_PATH}" ]; then
+    echo "ERROR: Kernel config not found at ${CONFIG_PATH}"
+    exit 1
+fi
+cp "${CONFIG_PATH}" "${BUILD_OBJ_DIR}/${ARCH}/default/.config"
 
-mkdir -p "$RPMBUILD_DIR"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+echo ">>> Preparing RPM build tree..."
+mkdir -p ${RPMBUILD_DIR}/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
 
-# === Kernel build ===
-make -C "$KERNEL_SRC_DIR" O="$BUILD_OBJ_DIR" olddefconfig
-make -C "$KERNEL_SRC_DIR" O="$BUILD_OBJ_DIR" -j"$(nproc)"
-
-# === Create RPM ===
-cp "$CONFIG_PATH" "$RPMBUILD_DIR/SOURCES/.config"
-# Create a minimal kernel.spec if not exists
-if [ ! -f "$RPMBUILD_DIR/SPECS/kernel.spec" ]; then
-cat > "$RPMBUILD_DIR/SPECS/kernel.spec" <<'EOF'
-Name: kernel-custom
-Version: 6.16.7
-Release: 1
-Summary: Custom Linux kernel
-License: GPL
-Source0: .config
-BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
+echo ">>> Creating kernel.spec"
+cat > ${RPMBUILD_DIR}/SPECS/kernel.spec <<'EOF'
+# Minimal kernel.spec for building custom kernel RPM
+Name:           custom-kernel
+Version:        6.16.7
+Release:        1
+Summary:        Custom Linux Kernel
+License:        GPL-2.0-or-later
+Group:          System/Kernel
+Source0:        %{_sourcedir}/linux-6.16.7.tar.xz
+BuildRoot:      %{_tmppath}/%{name}-%{version}-buildroot
+BuildRequires:  bc, bison, flex, gcc, make, ncurses-devel, perl
 %description
-Custom Linux kernel built via GitHub Actions.
+Custom Linux kernel built from source.
 %prep
+%setup -q -c -T
 %build
-make -C /usr/src/linux-6.16.7-1-obj -j$(nproc)
+make O=${BUILD_OBJ_DIR} olddefconfig
+make -C ${KERNEL_SRC_DIR} O=${BUILD_OBJ_DIR} -j$(nproc)
 %install
 mkdir -p %{buildroot}/boot
-cp /usr/src/linux-6.16.7-1-obj/arch/x86/boot/bzImage %{buildroot}/boot/vmlinuz-%{version}-custom
+cp ${BUILD_OBJ_DIR}/arch/x86/boot/bzImage %{buildroot}/boot/vmlinuz-custom
 %files
-/boot/vmlinuz-%{version}-custom
+/boot/vmlinuz-custom
 EOF
-fi
 
-rpmbuild -bb --define "_topdir $RPMBUILD_DIR" "$RPMBUILD_DIR/SPECS/kernel.spec"
+echo ">>> Copying kernel source to SOURCES..."
+cp linux-${KERNEL_VERSION}.tar.xz ${RPMBUILD_DIR}/SOURCES/
 
-echo "Kernel RPM build complete."
+echo ">>> Building RPM..."
+rpmbuild -bb --define "_topdir ${RPMBUILD_DIR}" --with baseonly ${RPMBUILD_DIR}/SPECS/kernel.spec
+
+echo ">>> Kernel RPM build complete. RPMS are in ${RPMBUILD_DIR}/RPMS/${ARCH}/"
