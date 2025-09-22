@@ -1,29 +1,27 @@
-name: Build Linux Kernel RPM
+name: Build Custom Kernel RPM
 
 on:
   workflow_dispatch:
 
 jobs:
-  build-kernel:
+  build:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
-      - name: Run kernel build in Docker
+      - name: Run kernel build inside Docker
         run: |
           docker run --rm -t \
             -v ${{ github.workspace }}:/workspace \
             -w /workspace \
             opensuse/tumbleweed \
             /workspace/build-kernel.sh kernel-config/6.16.7-1-default.custom/current
-        env:
-          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
-          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
 
-      - name: Upload RPM artifacts
+      - name: Upload RPMs
         uses: actions/upload-artifact@v4
         with:
-          name: kernel-rpms
-          path: /workspace/packages/RPMS/x86_64/*.rpm
+          name: custom-kernel-rpms
+          path: |
+            /workspace/usr/src/packages/RPMS/**/*.rpm
