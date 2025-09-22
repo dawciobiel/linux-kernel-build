@@ -11,17 +11,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Run kernel build inside Docker
+      - name: Set up Docker container and build
         run: |
           docker run --rm -t \
             -v ${{ github.workspace }}:/workspace \
+            -v /tmp/zypp-cache:/var/cache/zypp \
             -w /workspace \
             opensuse/tumbleweed \
-            /workspace/build-kernel.sh kernel-config/6.16.7-1-default.custom/current
+            bash /workspace/build-kernel.sh kernel-config/6.16.7-1-default.custom/current
 
-      - name: Upload RPMs
+      - name: Upload built RPMs
         uses: actions/upload-artifact@v4
         with:
           name: custom-kernel-rpms
-          path: |
-            /workspace/usr/src/packages/RPMS/**/*.rpm
+          path: /usr/src/packages/RPMS/**/*.rpm
