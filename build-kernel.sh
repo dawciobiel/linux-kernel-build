@@ -26,15 +26,10 @@ cp "$CONFIG_PATH" "$BUILD_OBJ_DIR/x86_64/default/.config"
 
 # Instalacja pakietów potrzebnych do builda kernela w Dockerze
 zypper -n in -t pattern devel_basis
-zypper -n in bc bison flex gcc git make ncurses-devel perl rpm-build libelf-devel kernel-devel wget
+zypper -n in bc bison flex gcc git make ncurses-devel perl rpm-build libelf-devel kernel-devel kernel-source
 
-# Pobranie oficjalnego kernel.spec z OBS
-# Jeśli wget nie działa, można użyć curl
-wget -O $RPMBUILD_DIR/SPECS/kernel.spec \
-     https://build.opensuse.org/package/view_file/openSUSE:Factory:Kernel/linux/kernel.spec
-# Alternatywnie:
-# curl -L -o $RPMBUILD_DIR/SPECS/kernel.spec \
-#      https://build.opensuse.org/package/view_file/openSUSE:Factory:Kernel/linux/kernel.spec
+# Skopiowanie kernel.spec z zainstalowanego kernel-source
+cp /usr/src/packages/SPECS/kernel.spec $RPMBUILD_DIR/SPECS/kernel.spec
 
 # Kopiowanie custom config do SOURCES
 cp "$CONFIG_PATH" $RPMBUILD_DIR/SOURCES/.config
