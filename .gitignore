@@ -1,3 +1,6 @@
 # output
+$CONTAINER_RPMBUILD/
 output/
+rpmbuild/
+rpms/
 
