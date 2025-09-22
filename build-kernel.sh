@@ -1,72 +1,81 @@
-#!/usr/bin/env bash
+#!/bin/bash
 set -euo pipefail
 
-CONFIG_PATH="${1:-}"
+CONFIG_PATH="$1"
+
+if [[ -z "$CONFIG_PATH" ]]; then
+  echo "Usage: $0 <kernel-config-path>"
+  exit 1
+fi
+
 KERNEL_VERSION="6.16.7"
-KERNEL_SRC_DIR="/usr/src/linux-${KERNEL_VERSION}"
-BUILD_OBJ_DIR="/usr/src/linux-${KERNEL_VERSION}-obj"
-RPMBUILD_DIR="/usr/src/packages"
-ARCH="x86_64"
+KERNEL_TAR="linux-${KERNEL_VERSION}.tar.xz"
+KERNEL_DIR="linux-${KERNEL_VERSION}"
+BUILD_DIR="/usr/src/packages/BUILD/custom-kernel-${KERNEL_VERSION}-build"
+RPM_DIR="/usr/src/packages"
 
 echo ">>> Installing build dependencies..."
-zypper --non-interactive ar -f http://download.opensuse.org/tumbleweed/repo/oss/ repo-oss || true
-zypper --non-interactive ar -f http://download.opensuse.org/tumbleweed/repo/non-oss/ repo-non-oss || true
-zypper --non-interactive ar -f http://download.opensuse.org/update/tumbleweed/ repo-update || true
-zypper --non-interactive ref
-
-zypper --non-interactive in \
-  bc bison flex gcc make ncurses-devel perl rpm-build wget
+zypper -n refresh
+zypper -n install --capability bc bison flex gcc make ncurses-devel perl rpm-build wget tar xz
 
 echo ">>> Downloading kernel sources..."
-if [ ! -f "linux-${KERNEL_VERSION}.tar.xz" ]; then
-    wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${KERNEL_VERSION}.tar.xz
-fi
+wget -q --show-progress -O "$KERNEL_TAR" "https://cdn.kernel.org/pub/linux/kernel/v6.x/$KERNEL_TAR"
+
+echo ">>> Preparing build directories..."
+rm -rf "$BUILD_DIR"
+mkdir -p "$BUILD_DIR"
+mkdir -p "$RPM_DIR"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
 
 echo ">>> Extracting kernel sources..."
-rm -rf "${KERNEL_SRC_DIR}" "${BUILD_OBJ_DIR}"
-tar -xf linux-${KERNEL_VERSION}.tar.xz
-mkdir -p "${BUILD_OBJ_DIR}/${ARCH}/default"
+tar -xf "$KERNEL_TAR" -C "$BUILD_DIR"
 
 echo ">>> Copying kernel config..."
-if [ ! -f "${CONFIG_PATH}" ]; then
-    echo "ERROR: Kernel config not found at ${CONFIG_PATH}"
-    exit 1
-fi
-cp "${CONFIG_PATH}" "${BUILD_OBJ_DIR}/${ARCH}/default/.config"
+cp "$CONFIG_PATH" "$BUILD_DIR/$KERNEL_DIR/.config"
 
-echo ">>> Preparing RPM build tree..."
-mkdir -p ${RPMBUILD_DIR}/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
-
-echo ">>> Creating kernel.spec"
-cat > ${RPMBUILD_DIR}/SPECS/kernel.spec <<'EOF'
-# Minimal kernel.spec for building custom kernel RPM
+echo ">>> Creating kernel.spec..."
+cat > "$RPM_DIR/SPECS/kernel.spec" <<'EOF'
 Name:           custom-kernel
 Version:        6.16.7
 Release:        1
-Summary:        Custom Linux Kernel
-License:        GPL-2.0-or-later
-Group:          System/Kernel
+Summary:        Custom built Linux kernel
+License:        GPL-2.0
 Source0:        %{_sourcedir}/linux-6.16.7.tar.xz
-BuildRoot:      %{_tmppath}/%{name}-%{version}-buildroot
 BuildRequires:  bc, bison, flex, gcc, make, ncurses-devel, perl
 %description
-Custom Linux kernel built from source.
+Custom Linux kernel built from sources.
+
 %prep
 %setup -q -c -T
+cp %{_sourcedir}/linux-6.16.7.tar.xz ./
+tar -xf linux-6.16.7.tar.xz
+cd linux-6.16.7
+cp ../../../../workspace/kernel-config/6.16.7-1-default.custom/current .config
+
 %build
-make O=${BUILD_OBJ_DIR} olddefconfig
-make -C ${KERNEL_SRC_DIR} O=${BUILD_OBJ_DIR} -j$(nproc)
+cd linux-6.16.7
+make olddefconfig
+make -j$(nproc)
+
 %install
+cd linux-6.16.7
 mkdir -p %{buildroot}/boot
-cp ${BUILD_OBJ_DIR}/arch/x86/boot/bzImage %{buildroot}/boot/vmlinuz-custom
+cp -v arch/x86/boot/bzImage %{buildroot}/boot/vmlinuz-%{version}
+mkdir -p %{buildroot}/usr/src/kernels/%{version}
+cp -r * %{buildroot}/usr/src/kernels/%{version}
+
 %files
-/boot/vmlinuz-custom
+/boot/vmlinuz-%{version}
+/usr/src/kernels/%{version}
+
+%changelog
+* Thu Sep 22 2025 Custom Kernel Builder <you@example.com> - 6.16.7-1
+- Initial build
 EOF
 
 echo ">>> Copying kernel source to SOURCES..."
-cp linux-${KERNEL_VERSION}.tar.xz ${RPMBUILD_DIR}/SOURCES/
+cp "$KERNEL_TAR" "$RPM_DIR/SOURCES/"
 
 echo ">>> Building RPM..."
-rpmbuild -bb --define "_topdir ${RPMBUILD_DIR}" --with baseonly ${RPMBUILD_DIR}/SPECS/kernel.spec
+rpmbuild -bb --define "_topdir $RPM_DIR" --with baseonly "$RPM_DIR/SPECS/kernel.spec"
 
-echo ">>> Kernel RPM build complete. RPMS are in ${RPMBUILD_DIR}/RPMS/${ARCH}/"
+echo ">>> Build finished. RPMs are in $RPM_DIR/RPMS/"
