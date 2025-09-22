@@ -1,17 +1,17 @@
-name: Build Custom Kernel RPM
+name: Build custom kernel RPM
 
 on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-kernel:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Set up Docker volume cache for zypper
+      - name: Set up Docker volumes
         run: |
           mkdir -p /tmp/zypp-cache
 
@@ -22,10 +22,10 @@ jobs:
             -v /tmp/zypp-cache:/var/cache/zypp \
             -w /workspace \
             opensuse/tumbleweed \
-            /workspace/build-kernel.sh "kernel-config/6.16.7-1-default.custom/current"
+            bash -c "./build-kernel.sh kernel-config/6.16.7-1-default.custom/current"
 
-      - name: Upload built RPMs
-        uses: actions/upload-artifact@v4
+      - name: Upload RPMs as artifacts
+        uses: actions/upload-artifact@v3
         with:
           name: kernel-rpms
-          path: /usr/src/packages/RPMS/*.rpm
+          path: /usr/src/packages/RPMS/x86_64/*.rpm
