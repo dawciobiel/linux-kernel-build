@@ -9,8 +9,9 @@ if [ -z "$CONFIG_PATH" ]; then
   exit 1
 fi
 
-KERNEL_SRC_DIR="/usr/src/linux-6.16.7-1"
-BUILD_OBJ_DIR="/usr/src/linux-6.16.7-1-obj"
+KERNEL_VERSION="6.16.7"
+KERNEL_SRC_DIR="/usr/src/linux-${KERNEL_VERSION}-1"
+BUILD_OBJ_DIR="/usr/src/linux-${KERNEL_VERSION}-1-obj"
 RPMBUILD_DIR="/usr/src/packages"
 
 echo ">>> Installing build dependencies..."
@@ -18,9 +19,13 @@ zypper -n ref
 zypper -n in bc bison flex gcc git make ncurses-devel perl \
   rpm-build wget libopenssl-devel libelf-devel dwarves
 
-echo ">>> Installing kernel source..."
-zypper -n si kernel-source
-zypper -n in kernel-source
+echo ">>> Downloading kernel sources..."
+cd /usr/src
+if [ ! -d "$KERNEL_SRC_DIR" ]; then
+    wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${KERNEL_VERSION}.tar.xz
+    tar -xf linux-${KERNEL_VERSION}.tar.xz
+    mv linux-${KERNEL_VERSION} "$KERNEL_SRC_DIR"
+fi
 
 echo ">>> Preparing build directories..."
 mkdir -p "$BUILD_OBJ_DIR/x86_64/default"
@@ -29,11 +34,10 @@ mkdir -p "$RPMBUILD_DIR/BUILD" "$RPMBUILD_DIR/RPMS" "$RPMBUILD_DIR/SOURCES" "$RP
 cp "$CONFIG_PATH" "$BUILD_OBJ_DIR/x86_64/default/.config"
 
 echo ">>> Running olddefconfig..."
-cd "$KERNEL_SRC_DIR"
-make O="$BUILD_OBJ_DIR" olddefconfig
+make -C "$KERNEL_SRC_DIR" O="$BUILD_OBJ_DIR" olddefconfig
 
 echo ">>> Building kernel RPMs..."
-make O="$BUILD_OBJ_DIR" -j"$(nproc)" rpm
+make -C "$KERNEL_SRC_DIR" O="$BUILD_OBJ_DIR" -j"$(nproc)" rpm
 
 echo ">>> Build finished. RPMs are in $RPMBUILD_DIR/RPMS/"
 ls -lh "$RPMBUILD_DIR"/RPMS/* || true
