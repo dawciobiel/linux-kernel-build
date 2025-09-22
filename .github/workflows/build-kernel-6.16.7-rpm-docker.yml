@@ -4,52 +4,37 @@ on:
   workflow_dispatch:
     inputs:
       kernel_config:
-        description: 'Path to kernel .config file in repo'
+        description: "Path to kernel config"
         required: true
-        default: 'kernel-config/6.16.7-1-default.custom/current'
+        default: "kernel-config/6.16.7-1-default.custom/current"
 
 jobs:
-  build-kernel:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout sources
         uses: actions/checkout@v4
 
-      - name: Prepare packages dir (host -> will be mounted into container)
-        run: mkdir -p packages
-
-      - name: Cache zypper packages
-        uses: actions/cache@v4
-        with:
-          path: /tmp/zypp-cache
-          key: zypper-cache-${{ github.event.inputs.kernel_config }}
-          restore-keys: zypper-cache-
+      - name: Write GPG key and passphrase to files
+        run: |
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" > gpg-private.key
+          echo "${{ secrets.GPG_PASSPHRASE }}" > gpg-passphrase.txt
 
       - name: Build kernel RPM inside Docker
-        env:
-          # these env vars are available to the runner shell; they also need to be passed into container below with -e
-          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
-          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           docker run --rm -t \
             -v "${{ github.workspace }}":/workspace \
             -v "${{ github.workspace }}/packages":/usr/src/packages \
             -v /tmp/zypp-cache:/var/cache/zypp \
             -w /workspace \
-            -e GPG_PRIVATE_KEY="${{ secrets.GPG_PRIVATE_KEY }}" \
-            -e GPG_PASSPHRASE="${{ secrets.GPG_PASSPHRASE }}" \
+            -v "${{ github.workspace }}/gpg-private.key:/tmp/gpg-private.key:ro" \
+            -v "${{ github.workspace }}/gpg-passphrase.txt:/tmp/gpg-passphrase.txt:ro" \
             opensuse/tumbleweed \
             /workspace/build-kernel.sh "${{ github.event.inputs.kernel_config }}"
 
-      - name: Upload kernel RPMs
+      - name: Upload RPM artifacts
         uses: actions/upload-artifact@v4
         with:
           name: kernel-rpms
-          path: packages/RPMS/x86_64/*.rpm
-
-      - name: Upload build log
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-log
-          path: build.log
+          path: packages/RPMS/**/*.rpm
