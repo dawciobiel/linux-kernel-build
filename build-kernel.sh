@@ -35,7 +35,7 @@ echo ">>> Preparing RPM build tree..."
 mkdir -p "$RPM_DIR"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
 
 echo ">>> Copying kernel config to SOURCES..."
-cp "$CONFIG_PATH" "$RPM_DIR/SOURCES/custom.config"
+cp /workspace/kernel-config/6.16.7-1-default.custom/current "$RPM_DIR/SOURCES/custom.config"
 
 echo ">>> Creating kernel.spec..."
 cat > "$RPM_DIR/SPECS/kernel.spec" <<'EOF'
