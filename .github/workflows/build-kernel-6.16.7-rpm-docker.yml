@@ -25,7 +25,7 @@ jobs:
             /workspace/build-kernel.sh "kernel-config/6.16.7-1-default.custom/current"
 
       - name: Upload built RPMs
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: kernel-rpms
           path: /usr/src/packages/RPMS/*.rpm
