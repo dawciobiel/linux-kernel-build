@@ -1,104 +1,77 @@
-#!/usr/bin/env bash
+#!/bin/bash
 set -euo pipefail
 
-# -----------------------------
-# Custom Kernel RPM Builder
-# -----------------------------
+# Usage: ./build-kernel.sh
+# Builds an RPM of Linux kernel 6.16.7 on openSUSE Tumbleweed
 
-# Parametry
-CONFIG_PATH="${1:-}"   # np. kernel-config/6.16.7-1-default.custom/current
 KERNEL_VERSION="6.16.7"
 KERNEL_TARBALL="linux-${KERNEL_VERSION}.tar.xz"
 KERNEL_SRC_DIR="/usr/src/linux-${KERNEL_VERSION}"
-BUILD_OBJ_DIR="/usr/src/packages/BUILD/custom-kernel-${KERNEL_VERSION}-build"
 RPMBUILD_DIR="/usr/src/packages"
 CUSTOM_CONFIG="${RPMBUILD_DIR}/SOURCES/custom.config"
 
-# Sprawdzenie configu
-if [[ -z "$CONFIG_PATH" ]]; then
-    echo "Usage: $0 <path-to-kernel-config>"
-    exit 1
-fi
-if [[ ! -f "$CONFIG_PATH" ]]; then
-    echo "Kernel config not found at $CONFIG_PATH"
-    exit 1
-fi
-
-# -----------------------------
-# Instalacja zależności w Tumbleweed
-# -----------------------------
 echo ">>> Installing build dependencies..."
 zypper --non-interactive ref
-zypper --non-interactive install -y \
-    bc bison flex gcc make ncurses-devel perl rpm-build wget tar xz
+zypper --non-interactive install \
+    bc bison flex gcc make ncurses-devel perl rpm-build tar xz wget
 
-# -----------------------------
-# Pobranie źródeł jądra
-# -----------------------------
 echo ">>> Downloading kernel sources..."
 cd /usr/src
-if [[ ! -f "$KERNEL_TARBALL" ]]; then
-    wget -O "$KERNEL_TARBALL" "https://cdn.kernel.org/pub/linux/kernel/v6.x/$KERNEL_TARBALL"
+if [ ! -f "$KERNEL_TARBALL" ]; then
+    wget https://cdn.kernel.org/pub/linux/kernel/v6.x/${KERNEL_TARBALL}
 fi
 
-# -----------------------------
-# Przygotowanie drzewa RPM
-# -----------------------------
 echo ">>> Preparing build directories..."
-rm -rf "$BUILD_OBJ_DIR"
-mkdir -p "$BUILD_OBJ_DIR"
+rm -rf "$KERNEL_SRC_DIR"
+tar -xf "$KERNEL_TARBALL"
+mv "linux-${KERNEL_VERSION}" "$KERNEL_SRC_DIR"
+
 mkdir -p "$RPMBUILD_DIR"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
 
-# Kopiowanie własnego configu
 echo ">>> Copying kernel config to SOURCES..."
-cp "$CONFIG_PATH" "$CUSTOM_CONFIG"
+# Use default x86_64_defconfig to avoid missing file
+cp "$KERNEL_SRC_DIR"/arch/x86/configs/x86_64_defconfig "$CUSTOM_CONFIG"
 
-# -----------------------------
-# Tworzenie prostego kernel.spec
-# -----------------------------
-SPEC_FILE="$RPMBUILD_DIR/SPECS/custom-kernel.spec"
-cat > "$SPEC_FILE" <<EOF
-Name:           custom-kernel
-Version:        $KERNEL_VERSION
-Release:        1
-Summary:        Custom Linux Kernel
-License:        GPL
-Source0:        $KERNEL_TARBALL
-Source1:        custom.config
-BuildRoot:      %{_topdir}/BUILD/%{name}-%{version}-build/BUILDROOT
-
+echo ">>> Creating kernel.spec..."
+cat > "$RPMBUILD_DIR/SPECS/kernel.spec" <<EOF
+Name: custom-kernel
+Version: $KERNEL_VERSION
+Release: 1
+Summary: Custom Linux kernel $KERNEL_VERSION
+License: GPL-2.0
+Group: System Environment/Kernel
+Source0: $KERNEL_TARBALL
+BuildRoot: %{_tmppath}/%{name}-%{version}-build
 %description
-Custom Linux kernel built with your configuration.
+Custom Linux kernel built via GitHub Actions.
 
 %prep
 %setup -q -c -T
 cp %{_sourcedir}/custom.config .config
-tar -xf %{_sourcedir}/$KERNEL_TARBALL
-cd linux-%{version}
-# przygotowanie katalogu build obj
-mkdir -p $BUILD_OBJ_DIR
+tar -xf %{_sourcedir}/${KERNEL_TARBALL}
 
 %build
-cd linux-%{version}
-make O=$BUILD_OBJ_DIR olddefconfig
-make -j$(nproc) O=$BUILD_OBJ_DIR
+make -C linux-${KERNEL_VERSION} O=$(pwd) olddefconfig
+make -C linux-${KERNEL_VERSION} O=$(pwd) -j$(nproc)
 
 %install
-mkdir -p %{buildroot}/boot
-cp -v $BUILD_OBJ_DIR/arch/x86/boot/bzImage %{buildroot}/boot/vmlinuz-%{version}-custom
+rm -rf %{buildroot}
+make -C linux-${KERNEL_VERSION} O=$(pwd) INSTALL_MOD_PATH=%{buildroot} modules_install
+make -C linux-${KERNEL_VERSION} O=$(pwd) INSTALL_PATH=%{buildroot}/boot install
 
 %files
-/boot/vmlinuz-%{version}-custom
+/boot/*
+/lib/modules/*
 
 %changelog
 * $(date +"%a %b %d %Y") Custom Kernel Builder <you@example.com> - $KERNEL_VERSION-1
-- Built custom kernel
+- Built via GitHub Actions
 EOF
 
-# -----------------------------
-# Budowanie RPM
-# -----------------------------
-echo ">>> Building RPM..."
-rpmbuild -bb --define "_topdir $RPMBUILD_DIR" "$SPEC_FILE"
+echo ">>> Copying kernel tarball to SOURCES..."
+cp "$KERNEL_TARBALL" "$RPMBUILD_DIR/SOURCES/"
 
-echo ">>> RPM build complete. RPMs are in $RPMBUILD_DIR/RPMS"
+echo ">>> Building RPM..."
+rpmbuild -bb --define "_topdir $RPMBUILD_DIR" --with baseonly "$RPMBUILD_DIR/SPECS/kernel.spec"
+
+echo ">>> Done. RPMs are in $RPMBUILD_DIR/RPMS/x86_64/"
