@@ -30,7 +30,7 @@ fi
 echo ">>> Installing build dependencies..."
 zypper --non-interactive ref
 zypper --non-interactive install -y \
-    bc bison flex gcc make ncurses-devel perl rpm-build rpm-sign wget tar xz
+    bc bison flex gcc make ncurses-devel perl rpm-build wget tar xz
 
 # -----------------------------
 # Pobranie źródeł jądra
