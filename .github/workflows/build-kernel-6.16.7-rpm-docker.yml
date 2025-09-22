@@ -1,35 +1,25 @@
-name: Build Custom Kernel RPM
+name: Build Kernel RPM
 
 on:
   workflow_dispatch:
 
 jobs:
-  build-rpm:
+  build:
     runs-on: ubuntu-latest
-    container:
-      image: opensuse/tumbleweed:latest
-      options: --user root
-
-    env:
-      TZ: Europe/Warsaw
-
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-    - name: Install essential tools
-      run: |
-        zypper --non-interactive ref
-        zypper --non-interactive install -y \
-          bc bison flex gcc make ncurses-devel perl rpm-build wget tar xz
+      - name: Run kernel build in openSUSE Tumbleweed
+        run: |
+          docker run --rm -t \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            opensuse/tumbleweed \
+            /bin/bash -c "chmod +x build-kernel.sh && ./build-kernel.sh"
 
-    - name: Run kernel build script
-      run: |
-        chmod +x build-kernel.sh
-        ./build-kernel.sh "kernel-config/6.16.7-1-default.custom/current"
-
-    - name: Upload built RPMs
-      uses: actions/upload-artifact@v4
-      with:
-        name: custom-kernel-rpms
-        path: /usr/src/packages/RPMS/x86_64/*.rpm
+      - name: Upload RPM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel-rpms
+          path: /usr/src/packages/RPMS/x86_64/*.rpm
