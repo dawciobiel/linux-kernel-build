@@ -1,81 +1,104 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
-CONFIG_PATH="$1"
+# -----------------------------
+# Custom Kernel RPM Builder
+# -----------------------------
 
+# Parametry
+CONFIG_PATH="${1:-}"   # np. kernel-config/6.16.7-1-default.custom/current
+KERNEL_VERSION="6.16.7"
+KERNEL_TARBALL="linux-${KERNEL_VERSION}.tar.xz"
+KERNEL_SRC_DIR="/usr/src/linux-${KERNEL_VERSION}"
+BUILD_OBJ_DIR="/usr/src/packages/BUILD/custom-kernel-${KERNEL_VERSION}-build"
+RPMBUILD_DIR="/usr/src/packages"
+CUSTOM_CONFIG="${RPMBUILD_DIR}/SOURCES/custom.config"
+
+# Sprawdzenie configu
 if [[ -z "$CONFIG_PATH" ]]; then
     echo "Usage: $0 <path-to-kernel-config>"
     exit 1
 fi
-
-KERNEL_VERSION="6.16.7"
-KERNEL_TAR="linux-${KERNEL_VERSION}.tar.xz"
-KERNEL_SRC_DIR="/usr/src/linux-${KERNEL_VERSION}"
-BUILD_OBJ_DIR="/usr/src/linux-${KERNEL_VERSION}-obj"
-RPM_DIR="/usr/src/packages"
-
-echo ">>> Installing build dependencies..."
-zypper -n ref
-zypper -n in -t pattern devel_C_C++
-zypper -n in bc bison flex gcc make ncurses-devel perl rpm-build wget xz tar
-
-echo ">>> Downloading kernel sources..."
-cd /usr/src
-if [[ ! -f "$KERNEL_TAR" ]]; then
-    wget "https://cdn.kernel.org/pub/linux/kernel/v6.x/$KERNEL_TAR"
+if [[ ! -f "$CONFIG_PATH" ]]; then
+    echo "Kernel config not found at $CONFIG_PATH"
+    exit 1
 fi
 
-echo ">>> Extracting kernel sources..."
-tar -xf "$KERNEL_TAR"
+# -----------------------------
+# Instalacja zależności w Tumbleweed
+# -----------------------------
+echo ">>> Installing build dependencies..."
+zypper --non-interactive ref
+zypper --non-interactive install -y \
+    bc bison flex gcc make ncurses-devel perl rpm-build rpm-sign wget tar xz
 
+# -----------------------------
+# Pobranie źródeł jądra
+# -----------------------------
+echo ">>> Downloading kernel sources..."
+cd /usr/src
+if [[ ! -f "$KERNEL_TARBALL" ]]; then
+    wget -O "$KERNEL_TARBALL" "https://cdn.kernel.org/pub/linux/kernel/v6.x/$KERNEL_TARBALL"
+fi
+
+# -----------------------------
+# Przygotowanie drzewa RPM
+# -----------------------------
 echo ">>> Preparing build directories..."
-mkdir -p "$BUILD_OBJ_DIR/x86_64/default"
+rm -rf "$BUILD_OBJ_DIR"
+mkdir -p "$BUILD_OBJ_DIR"
+mkdir -p "$RPMBUILD_DIR"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
 
-echo ">>> Preparing RPM build tree..."
-mkdir -p "$RPM_DIR"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
-
+# Kopiowanie własnego configu
 echo ">>> Copying kernel config to SOURCES..."
-cp /workspace/kernel-config/6.16.7-1-default.custom/current "$RPM_DIR/SOURCES/custom.config"
+cp "$CONFIG_PATH" "$CUSTOM_CONFIG"
 
-echo ">>> Creating kernel.spec..."
-cat > "$RPM_DIR/SPECS/kernel.spec" <<'EOF'
-Name: custom-kernel
-Version: 6.16.7
-Release: 1
-Summary: Custom Linux Kernel
-License: GPL-2.0
-Source0: %{_sourcedir}/linux-6.16.7.tar.xz
-Source1: %{_sourcedir}/custom.config
-BuildRequires: bc, bison, flex, gcc, make, ncurses-devel, perl
+# -----------------------------
+# Tworzenie prostego kernel.spec
+# -----------------------------
+SPEC_FILE="$RPMBUILD_DIR/SPECS/custom-kernel.spec"
+cat > "$SPEC_FILE" <<EOF
+Name:           custom-kernel
+Version:        $KERNEL_VERSION
+Release:        1
+Summary:        Custom Linux Kernel
+License:        GPL
+Source0:        $KERNEL_TARBALL
+Source1:        custom.config
+BuildRoot:      %{_topdir}/BUILD/%{name}-%{version}-build/BUILDROOT
+
 %description
-Custom-built Linux kernel.
+Custom Linux kernel built with your configuration.
 
 %prep
 %setup -q -c -T
 cp %{_sourcedir}/custom.config .config
-tar -xf %{_sourcedir}/linux-6.16.7.tar.xz
-cd linux-6.16.7
+tar -xf %{_sourcedir}/$KERNEL_TARBALL
+cd linux-%{version}
+# przygotowanie katalogu build obj
+mkdir -p $BUILD_OBJ_DIR
 
 %build
-make O=$RPM_DIR/BUILD olddefconfig
-make O=$RPM_DIR/BUILD -j$(nproc)
+cd linux-%{version}
+make O=$BUILD_OBJ_DIR olddefconfig
+make -j$(nproc) O=$BUILD_OBJ_DIR
 
 %install
 mkdir -p %{buildroot}/boot
-cp -v $RPM_DIR/BUILD/arch/x86/boot/bzImage %{buildroot}/boot/vmlinuz-%{version}
+cp -v $BUILD_OBJ_DIR/arch/x86/boot/bzImage %{buildroot}/boot/vmlinuz-%{version}-custom
 
 %files
-/boot/vmlinuz-%{version}
+/boot/vmlinuz-%{version}-custom
 
 %changelog
-* Thu Sep 22 2025 Custom Kernel Builder <you@example.com> - 6.16.7-1
-- Initial build
+* $(date +"%a %b %d %Y") Custom Kernel Builder <you@example.com> - $KERNEL_VERSION-1
+- Built custom kernel
 EOF
 
-echo ">>> Copying kernel tarball to SOURCES..."
-cp "$KERNEL_TAR" "$RPM_DIR/SOURCES/"
-
+# -----------------------------
+# Budowanie RPM
+# -----------------------------
 echo ">>> Building RPM..."
-rpmbuild -bb --define "_topdir $RPM_DIR" --with baseonly "$RPM_DIR/SPECS/kernel.spec"
+rpmbuild -bb --define "_topdir $RPMBUILD_DIR" "$SPEC_FILE"
 
-echo ">>> Build complete. RPMs are in $RPM_DIR/RPMS/"
+echo ">>> RPM build complete. RPMs are in $RPMBUILD_DIR/RPMS"
