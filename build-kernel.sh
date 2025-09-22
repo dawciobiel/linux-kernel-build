@@ -13,7 +13,7 @@ if [ -z "$CONFIG_PATH" ]; then
     exit 1
 fi
 
-# katalog buildowy kernela
+# katalog źródeł kernela
 KERNEL_SRC_DIR=/usr/src/linux-6.16.7-1
 
 # Dodawanie repozytoriów Tumbleweed jeśli brak
@@ -36,7 +36,7 @@ done
 # Odświeżanie repo
 zypper ref
 
-# Instalacja pakietów do builda kernela
+# Instalacja pakietów potrzebnych do builda kernela
 zypper -n in -t pattern devel_basis
 zypper -n in bc bison flex gcc git make ncurses-devel perl rpm-build wget libelf-devel kernel-source kernel-devel
 
@@ -47,8 +47,8 @@ cp -u "$CONFIG_PATH" "$BUILD_OBJ_DIR/x86_64/default/.config"
 
 cd "$BUILD_OBJ_DIR"
 
-# Przygotowanie starego configu (incremental build)
-make -C "$KERNEL_SRC_DIR" O="$BUILD_OBJ_DIR" oldconfig || true
+# Nieinteraktywny build configu
+make -C "$KERNEL_SRC_DIR" O="$BUILD_OBJ_DIR" olddefconfig
 
 # Budowa RPM
 make -C "$KERNEL_SRC_DIR" O="$BUILD_OBJ_DIR" -j$(nproc) rpm
