@@ -4,24 +4,32 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-rpm:
     runs-on: ubuntu-latest
+    container:
+      image: opensuse/tumbleweed:latest
+      options: --user root
+
+    env:
+      TZ: Europe/Warsaw
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
+    - name: Checkout repository
+      uses: actions/checkout@v3
 
-      - name: Set up Docker container and build
-        run: |
-          docker run --rm -t \
-            -v ${{ github.workspace }}:/workspace \
-            -v /tmp/zypp-cache:/var/cache/zypp \
-            -w /workspace \
-            opensuse/tumbleweed \
-            bash /workspace/build-kernel.sh kernel-config/6.16.7-1-default.custom/current
+    - name: Install essential tools
+      run: |
+        zypper --non-interactive ref
+        zypper --non-interactive install -y \
+          bc bison flex gcc make ncurses-devel perl rpm-build rpm-sign wget tar xz
 
-      - name: Upload built RPMs
-        uses: actions/upload-artifact@v4
-        with:
-          name: custom-kernel-rpms
-          path: /usr/src/packages/RPMS/**/*.rpm
+    - name: Run kernel build script
+      run: |
+        chmod +x build-kernel.sh
+        ./build-kernel.sh "kernel-config/6.16.7-1-default.custom/current"
+
+    - name: Upload built RPMs
+      uses: actions/upload-artifact@v4
+      with:
+        name: custom-kernel-rpms
+        path: /usr/src/packages/RPMS/x86_64/*.rpm
