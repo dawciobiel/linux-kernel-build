@@ -1,6 +1,11 @@
 #!/bin/bash
 set -eux
 
+# -------------------------
+# Kernel RPM build script for Tumbleweed Docker
+# Usage: ./build-kernel.sh <ścieżka_do_configu>
+# -------------------------
+
 CONFIG_PATH="$1"
 
 if [ -z "$CONFIG_PATH" ]; then
@@ -19,20 +24,22 @@ mkdir -p $RPMBUILD_DIR/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
 # Kopiujemy config do katalogu buildowego
 cp "$CONFIG_PATH" "$BUILD_OBJ_DIR/x86_64/default/.config"
 
-# Pobieramy oficjalny kernel.spec z OBS
+# Instalacja pakietów potrzebnych do builda kernela w Dockerze
+zypper -n in -t pattern devel_basis
+zypper -n in bc bison flex gcc git make ncurses-devel perl rpm-build libelf-devel kernel-devel wget
+
+# Pobranie oficjalnego kernel.spec z OBS
+# Jeśli wget nie działa, można użyć curl
 wget -O $RPMBUILD_DIR/SPECS/kernel.spec \
      https://build.opensuse.org/package/view_file/openSUSE:Factory:Kernel/linux/kernel.spec
+# Alternatywnie:
+# curl -L -o $RPMBUILD_DIR/SPECS/kernel.spec \
+#      https://build.opensuse.org/package/view_file/openSUSE:Factory:Kernel/linux/kernel.spec
 
-# Opcjonalnie można zmienić w spec file BUILDOBJ_DIR, ale w większości działa tak jak jest
-
-# Kopiujemy config do SOURCES, aby rpmbuild mógł go wykorzystać
+# Kopiowanie custom config do SOURCES
 cp "$CONFIG_PATH" $RPMBUILD_DIR/SOURCES/.config
 
-# Instalacja paczek potrzebnych do builda kernela w Dockerze
-zypper -n in -t pattern devel_basis
-zypper -n in bc bison flex gcc git make ncurses-devel perl rpm-build wget libelf-devel kernel-devel
-
-# Build RPM
+# Build RPM kernela
 rpmbuild -bb --define "_topdir $RPMBUILD_DIR" --with baseonly $RPMBUILD_DIR/SPECS/kernel.spec
 
 # Podpisanie RPM
