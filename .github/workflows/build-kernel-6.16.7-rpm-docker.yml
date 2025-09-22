@@ -23,7 +23,7 @@ jobs:
           key: zypper-cache-${{ github.event.inputs.kernel_config }}
           restore-keys: zypper-cache-
 
-      - name: Run kernel RPM build inside Docker
+      - name: Build kernel inside Docker
         env:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
@@ -40,3 +40,9 @@ jobs:
         with:
           name: kernel-rpms
           path: /usr/src/packages/RPMS/x86_64/*.rpm
+
+      - name: Upload build logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: /workspace/build.log
