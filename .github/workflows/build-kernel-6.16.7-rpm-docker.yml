@@ -2,39 +2,30 @@ name: Build Custom Kernel RPM
 
 on:
   workflow_dispatch:
-    inputs:
-      kernel_config:
-        description: "Path to kernel config"
-        required: true
-        default: "kernel-config/6.16.7-1-default.custom/current"
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout sources
-        uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-      - name: Write GPG key and passphrase to files
+      - name: Set up Docker volume cache for zypper
         run: |
-          echo "${{ secrets.GPG_PRIVATE_KEY }}" > gpg-private.key
-          echo "${{ secrets.GPG_PASSPHRASE }}" > gpg-passphrase.txt
+          mkdir -p /tmp/zypp-cache
 
-      - name: Build kernel RPM inside Docker
+      - name: Build kernel inside Docker
         run: |
           docker run --rm -t \
-            -v "${{ github.workspace }}":/workspace \
-            -v "${{ github.workspace }}/packages":/usr/src/packages \
+            -v ${{ github.workspace }}:/workspace \
             -v /tmp/zypp-cache:/var/cache/zypp \
             -w /workspace \
-            -v "${{ github.workspace }}/gpg-private.key:/tmp/gpg-private.key:ro" \
-            -v "${{ github.workspace }}/gpg-passphrase.txt:/tmp/gpg-passphrase.txt:ro" \
             opensuse/tumbleweed \
-            /workspace/build-kernel.sh "${{ github.event.inputs.kernel_config }}"
+            /workspace/build-kernel.sh "kernel-config/6.16.7-1-default.custom/current"
 
-      - name: Upload RPM artifacts
-        uses: actions/upload-artifact@v4
+      - name: Upload built RPMs
+        uses: actions/upload-artifact@v3
         with:
           name: kernel-rpms
-          path: packages/RPMS/**/*.rpm
+          path: /usr/src/packages/RPMS/*.rpm
