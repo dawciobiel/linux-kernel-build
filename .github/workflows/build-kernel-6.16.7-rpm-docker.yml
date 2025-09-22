@@ -1,4 +1,4 @@
-name: Build custom kernel RPM
+name: Build Linux Kernel RPM
 
 on:
   workflow_dispatch:
@@ -6,26 +6,28 @@ on:
 jobs:
   build-kernel:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Set up Docker volumes
+      - name: Set up cache for zypper
         run: |
           mkdir -p /tmp/zypp-cache
 
-      - name: Build kernel inside Docker
+      - name: Run incremental kernel build inside Docker
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           docker run --rm -t \
             -v ${{ github.workspace }}:/workspace \
             -v /tmp/zypp-cache:/var/cache/zypp \
             -w /workspace \
             opensuse/tumbleweed \
-            bash -c "./build-kernel.sh kernel-config/6.16.7-1-default.custom/current"
+            /workspace/build-kernel.sh "kernel-config/6.16.7-1-default.custom/current"
 
-      - name: Upload RPMs as artifacts
-        uses: actions/upload-artifact@v4
+      - name: Upload built RPMs as artifact
+        uses: actions/upload-artifact@v3
         with:
           name: kernel-rpms
           path: /usr/src/packages/RPMS/x86_64/*.rpm
