@@ -44,7 +44,7 @@ BuildRoot:      %{_topdir}/BUILD/%{name}-%{version}-build
 
 # SMP build definitions
 %define _smp_build 1
-%define _smp_build_n 8
+%define _smp_build_n 4
 
 %description
 Custom Linux kernel built locally.
@@ -101,6 +101,11 @@ cp -v arch/x86/boot/bzImage %{buildroot}/boot/vmlinuz-%{version}-custom
 # Opcjonalnie: skopiuj też System.map i config
 cp -v System.map %{buildroot}/boot/System.map-%{version}-custom
 cp -v .config %{buildroot}/boot/config-%{version}-custom
+
+%files
+/boot/vmlinuz-%{version}-custom
+/boot/System.map-%{version}-custom
+/boot/config-%{version}-custom
 EOF
 
 # Podmiana wersji i configu

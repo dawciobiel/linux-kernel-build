@@ -1,20 +1,28 @@
+// .devcontainer/devcontainer.json
 {
-  "name": "Kernel Build Environment",
-  "image": "opensuse/tumbleweed:latest",
-  
-  "features": {
-    "ghcr.io/devcontainers/features/docker-in-docker:2": {
-      "version": "latest",
-      "enableNonRootDocker": "true"
+  "name": "openSUSE Tumbleweed Kernel Build",
+  "build": {
+    "dockerfile": "docker/tumbleweed.Dockerfile",
+    "context": "..",
+    "args": {
+      "BASE_IMAGE": "opensuse/tumbleweed:latest"
     }
   },
-  
-  "postCreateCommand": "zypper --non-interactive ref && zypper --non-interactive --gpg-auto-import-keys install bash bc bison flex gcc make ncurses-devel perl rpm-build tar xz wget curl libelf-devel libuuid-devel libblkid-devel libselinux-devel zlib-devel libopenssl-devel libcap-devel libattr-devel libseccomp-devel gettext-tools elfutils gnu_parallel python3 python3-devel git fakeroot dwarves",
-  
   "remoteUser": "root",
-  "workspaceFolder": "/workspace",
-  
-  "mounts": [
-    "source=codespace-cache,target=/tmp,type=volume"
+  "workspaceFolder": "/workspace/linux-kernel-build",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "terminal.integrated.shell.linux": "/bin/bash"
+      },
+      "extensions": [
+        "ms-vscode.remote-containers"
+      ]
+    }
+  },
+  "postCreateCommand": [
+    "zypper --non-interactive ref &&",
+    "zypper --non-interactive --gpg-auto-import-keys install neovim git bash bc bison flex gcc make ncurses-devel perl rpm-build tar xz wget curl libelf-devel libuuid-devel libblkid-devel libselinux-devel zlib-devel libopenssl-devel libcap-devel libattr-devel libseccomp-devel gettext-tools elfutils gnu_parallel python3 python3-devel fakeroot dwarves htop jq"
   ]
 }
+
