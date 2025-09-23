@@ -32,7 +32,9 @@ RUN zypper --non-interactive ref && \
         python3 \
         python3-devel \
         git \
-        fakeroot
+        fakeroot \
+        dwarves
+
 
 # Set working directory inside container
 WORKDIR /workspace
