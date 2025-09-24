@@ -29,8 +29,8 @@ RUN zypper --non-interactive ref && \
         gettext-tools \
         elfutils \
         gnu_parallel \
-        python3 \
-        python3-devel \
+        python313 \
+        python313-devel \
         git \
         fakeroot \
         dwarves
