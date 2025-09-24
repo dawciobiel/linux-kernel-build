@@ -2,7 +2,7 @@
 {
   "name": "openSUSE Tumbleweed Kernel Build",
   "build": {
-    "dockerfile": "docker/tumbleweed.Dockerfile",
+    "dockerfile": "../docker/tumbleweed.Dockerfile",
     "context": "..",
     "args": {
       "BASE_IMAGE": "opensuse/tumbleweed:latest"
