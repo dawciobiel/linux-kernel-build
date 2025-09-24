@@ -16,6 +16,9 @@ BUILD_SCRIPT="/workspace/scripts/local/build-kernel-in-docker.sh"
 
 echo ">>> Building kernel in Docker (openSUSE Tumbleweed)..."
 
+# Remove existing container if it's still around
+docker rm -f kernel-builder-container >/dev/null 2>&1 || true
+
 docker run --name kernel-builder-container -it \
     -v "$REPO_ROOT:/workspace" \
     -w /workspace \
