@@ -21,7 +21,7 @@ fi
 echo ">>> Preparing build directories..."
 rm -rf "$KERNEL_SRC_DIR"
 tar -xf "$KERNEL_TARBALL"
-mv "linux-${KERNEL_VERSION}" "$KERNEL_SRC_DIR"
+
 
 mkdir -p "$RPMBUILD_DIR"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
 
