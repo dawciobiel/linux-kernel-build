@@ -71,16 +71,20 @@ grep -E "CONFIG_MODULE_SIG|CONFIG_SYSTEM_TRUSTED_KEYS|CONFIG_SYSTEM_REVOCATION_K
 echo "=================================="
 
 %build
+echo ">>> Compiling kernel..."
 # Jesteśmy już w katalogu linux-__KERNEL_VERSION__
 make -s -j$(nproc)
+echo ">>> Kernel compilation complete."
 
 %install
+echo ">>> Installing kernel..."
 mkdir -p %{buildroot}/boot
 cp -v arch/x86/boot/bzImage %{buildroot}/boot/vmlinuz-%{version}-custom
 
 # Opcjonalnie: skopiuj też System.map i config
 cp -v System.map %{buildroot}/boot/System.map-%{version}-custom
 cp -v .config %{buildroot}/boot/config-%{version}-custom
+echo ">>> Kernel installation complete."
 
 %files
 /boot/vmlinuz-%{version}-custom

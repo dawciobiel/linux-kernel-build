@@ -47,13 +47,19 @@ cp %{_sourcedir}/custom.config .config
 tar -xf %{_sourcedir}/${KERNEL_TARBALL}
 
 %build
+echo ">>> Configuring kernel (olddefconfig)..."
 make -C linux-${KERNEL_VERSION} O=$(pwd) olddefconfig
+echo ">>> Compiling kernel..."
 make -C linux-${KERNEL_VERSION} O=$(pwd) -j$(nproc)
+echo ">>> Kernel compilation complete."
 
 %install
 rm -rf %{buildroot}
+echo ">>> Installing kernel modules..."
 make -C linux-${KERNEL_VERSION} O=$(pwd) INSTALL_MOD_PATH=%{buildroot} modules_install
+echo ">>> Installing kernel..."
 make -C linux-${KERNEL_VERSION} O=$(pwd) INSTALL_PATH=%{buildroot}/boot install
+echo ">>> Kernel installation complete."
 
 %files
 /boot/*
