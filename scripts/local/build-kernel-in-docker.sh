@@ -73,7 +73,7 @@ echo "=================================="
 %build
 echo ">>> Compiling kernel..."
 # Jesteśmy już w katalogu linux-__KERNEL_VERSION__
-make -s -j$(nproc)
+make -j$(nproc)
 echo ">>> Kernel compilation complete."
 
 %install
