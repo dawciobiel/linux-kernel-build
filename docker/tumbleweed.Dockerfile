@@ -1,39 +1,39 @@
 # Dockerfile for local kernel build on openSUSE Tumbleweed
-FROM docker.io/opensuse/tumbleweed:latest
+FROM ubuntu:latest
 
 # Update repositories and install all required build dependencies
-RUN zypper --non-interactive ref && \
-    zypper --non-interactive --gpg-auto-import-keys install \
+RUN apt-get update && apt-get install -y --no-install-recommends \
         bash \
         bc \
         bison \
         flex \
         gcc \
         make \
-        ncurses-devel \
+        libncurses-dev \
         perl \
-        rpm-build \
+        rpm \
         tar \
-        xz \
+        xz-utils \
         wget \
         curl \
-        libelf-devel \
-        libuuid-devel \
-        libblkid-devel \
-        libselinux-devel \
-        zlib-devel \
-        libopenssl-devel \
-        libcap-devel \
-        libattr-devel \
-        libseccomp-devel \
-        gettext-tools \
+        libelf-dev \
+        uuid-dev \
+        libblkid-dev \
+        libselinux1-dev \
+        zlib1g-dev \
+        libssl-dev \
+        libcap-dev \
+        libattr1-dev \
+        libseccomp-dev \
+        gettext \
         elfutils \
-        gnu_parallel \
-        python313 \
-        python313-devel \
+        parallel \
+        python3 \
+        python3-dev \
         git \
         fakeroot \
-        dwarves
+        dwarves && \
+    rm -rf /var/lib/apt/lists/*
 
 
 # Set working directory inside container
