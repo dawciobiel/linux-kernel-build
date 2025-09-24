@@ -1,5 +1,5 @@
 # Dockerfile for local kernel build on openSUSE Tumbleweed
-FROM opensuse/tumbleweed:latest
+FROM docker.io/opensuse/tumbleweed:latest
 
 # Update repositories and install all required build dependencies
 RUN zypper --non-interactive ref && \
