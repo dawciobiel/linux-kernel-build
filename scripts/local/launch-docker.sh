@@ -16,7 +16,7 @@ BUILD_SCRIPT="/workspace/scripts/local/docker-build-kernel.sh"
 
 echo ">>> Building kernel in Docker (openSUSE Tumbleweed)..."
 
-docker run --rm -it \
+docker run --name kernel-builder-container -it \
     -v "$REPO_ROOT:/workspace" \
     -w /workspace \
     "$DOCKER_IMAGE" \

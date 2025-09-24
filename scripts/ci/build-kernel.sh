@@ -10,10 +10,7 @@ KERNEL_SRC_DIR="/usr/src/linux-${KERNEL_VERSION}"
 RPMBUILD_DIR="/usr/src/packages"
 CUSTOM_CONFIG="${RPMBUILD_DIR}/SOURCES/custom.config"
 
-echo ">>> Installing build dependencies..."
-zypper --non-interactive ref
-zypper --non-interactive install \
-    bc bison flex gcc make ncurses-devel perl rpm-build tar xz wget
+
 
 echo ">>> Downloading kernel sources..."
 cd /usr/src
@@ -28,9 +25,8 @@ mv "linux-${KERNEL_VERSION}" "$KERNEL_SRC_DIR"
 
 mkdir -p "$RPMBUILD_DIR"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
 
-echo ">>> Copying kernel config to SOURCES..."
-# Use default x86_64_defconfig to avoid missing file
-cp "$KERNEL_SRC_DIR"/arch/x86/configs/x86_64_defconfig "$CUSTOM_CONFIG"
+echo ">>> Copying custom kernel config to SOURCES..."
+cp "${PWD}/kernel-config/6.16.7-1-default.custom/current" "$CUSTOM_CONFIG"
 
 echo ">>> Creating kernel.spec..."
 cat > "$RPMBUILD_DIR/SPECS/kernel.spec" <<EOF

@@ -52,7 +52,7 @@ Custom Linux kernel built locally.
 %setup -q
 %build
 make olddefconfig
-make -j$(nproc)
+make -s -j$(nproc)
 %install
 mkdir -p %{buildroot}/boot
 cp -v arch/x86/boot/bzImage %{buildroot}/boot/vmlinuz-%{version}-custom

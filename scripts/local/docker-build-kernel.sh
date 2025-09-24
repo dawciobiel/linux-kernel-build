@@ -72,27 +72,7 @@ echo "=================================="
 
 %build
 # Jesteśmy już w katalogu linux-__KERNEL_VERSION__
-# Build kernel with progress tracking
-echo ">>> Building kernel (this may take several minutes)..."
-start_time=$(date +%s)
-count=0
-
-make -j%{_smp_build_n} 2>&1 | while read line; do
-    if echo "$line" | grep -qE "^\s*(CC|LD|AR|AS|GEN)\s"; then
-        ((count++))
-        if ((count % 50 == 0)); then  # Update co 50 plików
-            current_time=$(date +%s)
-            elapsed=$((current_time - start_time))
-            echo ">>> Compiled $count files (${elapsed}s elapsed)"
-        fi
-    elif echo "$line" | grep -qE -i "(error|warning|failed|fatal|panic|oops)"; then
-        echo "$line"
-    fi
-done
-
-end_time=$(date +%s)
-total_time=$((end_time - start_time))
-echo ">>> Build completed in ${total_time}s"
+make -s -j$(nproc)
 
 %install
 mkdir -p %{buildroot}/boot
@@ -117,3 +97,9 @@ rpmbuild -bb --define "_topdir $RPMBUILD_ROOT" "$RPM_SPEC"
 
 echo ">>> Kernel build completed. RPMs are in $RPMBUILD_ROOT/RPMS/"
 find "$RPMBUILD_ROOT/RPMS/" -name "*.rpm" -exec ls -lh {} \;
+
+echo ">>> Copying RPMs to workspace..."
+mkdir -p /workspace/rpms/
+cp -v "$RPMBUILD_ROOT"/RPMS/x86_64/*.rpm /workspace/rpms/
+echo ">>> RPMs copied to /workspace/rpms/"
+
