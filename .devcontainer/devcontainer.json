@@ -8,8 +8,9 @@
       "BASE_IMAGE": "opensuse/tumbleweed:latest"
     }
   },
-  "features": {
-    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {}
+      "GitHub.copilot",
+      "GitHub.vscode-github-actions"
+    ]
   },
   "remoteUser": "root",
   "workspaceFolder": "/workspace/linux-kernel-build",
