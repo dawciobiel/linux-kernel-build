@@ -50,7 +50,7 @@ tar -xf %{_sourcedir}/${KERNEL_TARBALL}
 echo ">>> Configuring kernel (olddefconfig)..."
 make -C linux-${KERNEL_VERSION} O=$(pwd) olddefconfig
 echo ">>> Compiling kernel..."
-make -C linux-${KERNEL_VERSION} O=$(pwd) -j$(nproc)
+make -C linux-${KERNEL_VERSION} O=$(pwd) -j$(nproc) 2>&1 | grep -vE "INSTALL|HOSTCC|HOSTLD|WRAP|UPD|CC"
 echo ">>> Kernel compilation complete."
 
 %install
