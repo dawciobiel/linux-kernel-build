@@ -73,7 +73,7 @@ echo "=================================="
 %build
 echo ">>> Compiling kernel (silent mode)..."
 # Jesteśmy już w katalogu linux-__KERNEL_VERSION__
-make -j$(nproc) 2>&1 | grep -vE "INSTALL|HOSTCC|HOSTLD|WRAP|UPD|CC|AS|AR|CERT|CHKSHA1|LD|LDS|OBJCOPY|VDSO2C|HYPERCALLS|GEN|COPY|MKELF|DESCEND|POLICY"
+make -j$(nproc) 2>&1 | grep -vE "AR|AS|BTF|CC|CERT|CHKSHA1|COPY|DESCEND|GEN|HOSTCC|HOSTLD|HYPERCALLS|INSTALL|MKELF|OBJCOPY|POLICY|UPD|VDSO2C|WRAP"
 echo ">>> Kernel compilation complete."
 
 %install
