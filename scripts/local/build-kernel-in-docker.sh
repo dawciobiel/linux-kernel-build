@@ -71,9 +71,9 @@ grep -E "CONFIG_MODULE_SIG|CONFIG_SYSTEM_TRUSTED_KEYS|CONFIG_SYSTEM_REVOCATION_K
 echo "=================================="
 
 %build
-echo ">>> Compiling kernel..."
+echo ">>> Compiling kernel (silent mode)..."
 # Jesteśmy już w katalogu linux-__KERNEL_VERSION__
-make -j$(nproc) 2>&1 | grep -vE "INSTALL|HOSTCC|HOSTLD|WRAP|UPD|CC"
+make -j$(nproc) 2>&1 | grep -vE "INSTALL|HOSTCC|HOSTLD|WRAP|UPD|CC|AS|AR|CERT|CHKSHA1|LD|LDS|OBJCOPY|VDSO2C|HYPERCALLS|GEN|COPY|MKELF|DESCEND|POLICY"
 echo ">>> Kernel compilation complete."
 
 %install
