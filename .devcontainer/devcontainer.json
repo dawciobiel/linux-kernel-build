@@ -23,5 +23,5 @@
     }
   },
   "remoteUser": "root",
-  "postCreateCommand": "bash scripts/local/setup-dev-env.sh"
+  "postCreateCommand": "bash scripts/ci/ci-kernel-build.sh"
 }
