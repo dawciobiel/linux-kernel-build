@@ -12,7 +12,7 @@ KERNEL_CONFIG_PATH="$1"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 DOCKER_IMAGE="my-kernel-builder"
-BUILD_SCRIPT="/workspace/scripts/local/local-build-kernel-in-docker.sh"
+BUILD_SCRIPT="/workspace/scripts/local/local-kernel-build-in-docker.sh"
 
 echo ">>> Building kernel in Docker (openSUSE Tumbleweed)..."
 
