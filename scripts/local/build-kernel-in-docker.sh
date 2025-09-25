@@ -15,6 +15,7 @@ echo ">>> Using kernel config: $KERNEL_CONFIG_PATH"
 
 # Parametry
 KERNEL_VERSION="6.16.7"
+BUILD_TIMESTAMP=$(date +%Y%m%d_%H%M)
 KERNEL_TAR="linux-${KERNEL_VERSION}.tar.xz"
 
 RPMBUILD_ROOT="/root/rpmbuild"
@@ -35,7 +36,7 @@ RPM_SPEC="$RPMBUILD_ROOT/SPECS/custom-kernel.spec"
 cat > "$RPM_SPEC" <<'EOF'
 Name:           custom-kernel
 Version:        __KERNEL_VERSION__
-Release:        1
+Release:        1.__BUILD_TIMESTAMP__
 Summary:        Custom kernel built locally
 License:        GPL
 Group:          System Environment/Kernel
@@ -95,6 +96,7 @@ EOF
 # Podmiana wersji i configu
 sed -i "s/__KERNEL_VERSION__/$KERNEL_VERSION/g" "$RPM_SPEC"
 sed -i "s|__KERNEL_CONFIG_PATH__|$KERNEL_CONFIG_PATH|g" "$RPM_SPEC"
+sed -i "s/__BUILD_TIMESTAMP__/$BUILD_TIMESTAMP/g" "$RPM_SPEC"
 
 echo ">>> Building RPM..."
 rpmbuild -bb --define "_topdir $RPMBUILD_ROOT" "$RPM_SPEC"
