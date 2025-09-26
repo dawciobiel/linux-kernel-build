@@ -1,6 +1,6 @@
 # output
 $CONTAINER_RPMBUILD/
-output/
+log/
 rpmbuild/
 rpms/
 
