@@ -101,8 +101,10 @@ cp -v arch/x86/boot/bzImage %{buildroot}/boot/vmlinuz-%{version}-custom
 cp -v System.map %{buildroot}/boot/System.map-%{version}-custom
 cp -v .config %{buildroot}/boot/config-%{version}-custom
 
-echo ">>> Installing kernel modules..."
-make -j__MAKE_JOBS__ modules_install INSTALL_MOD_PATH=%{buildroot}
+MODULES_INSTALL_LOG_FILE="/workspace/log/%{_build_timestamp_raw}/modules-install.log"
+mkdir -p $(dirname "$MODULES_INSTALL_LOG_FILE")
+echo ">>> Installing kernel modules (detailed output to modules-install.log)..."
+make -j__MAKE_JOBS__ modules_install INSTALL_MOD_PATH=%{buildroot} > "$MODULES_INSTALL_LOG_FILE" 2>&1
 
 echo ">>> Kernel and modules installation complete."
 
