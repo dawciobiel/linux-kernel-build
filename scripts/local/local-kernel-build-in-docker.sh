@@ -6,7 +6,7 @@ if [[ $# -gt 1 ]]; then
     exit 1
 fi
 
-KERNEL_CONFIG_PATH="${1:-kernel-config/6.16.7-1-default.custom/amd-fx8350.simplified}"
+KERNEL_CONFIG_PATH="${1:-kernel-config/6.16.8-1-default.custom/amd-fx8350.simplified}"
 
 BUILD_TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 LOG_DIR="/workspace/log/${BUILD_TIMESTAMP}"
@@ -17,13 +17,15 @@ echo ">>> Build output redirected to: $LOG_FILE"
 
 ( # Start of subshell to redirect all output
 
+START_TIME=$(date +%s)
+echo ">>> Build started at: $(date)"
 echo ">>> Running kernel build inside Docker"
 echo ">>> Using kernel config: $KERNEL_CONFIG_PATH"
 
 # Usuń instalację pakietów - powinny być już zainstalowane w obrazie Docker
 
 # Parametry
-KERNEL_VERSION="6.16.7"
+KERNEL_VERSION="6.16.8"
 MAKE_JOBS="9" # Optimal jobs for make -j on AMD FX-8350 (cores + 1 heuristic)
 KERNEL_TAR="linux-${KERNEL_VERSION}.tar.xz"
 
@@ -187,6 +189,11 @@ echo ">>> RPMs copied to /workspace/rpms/"
 
 # Build kernel modules RPM
 /workspace/scripts/local/local-kernel-module-rpm-build.sh "$KERNEL_VERSION" "$BUILD_TIMESTAMP"
+
+END_TIME=$(date +%s)
+DURATION=$((END_TIME - START_TIME))
+echo ">>> Build finished at: $(date)"
+echo ">>> Total execution time: $((DURATION / 60)) minutes and $((DURATION % 60)) seconds."
 
 ) 2>&1 | tee "$LOG_FILE"
 
