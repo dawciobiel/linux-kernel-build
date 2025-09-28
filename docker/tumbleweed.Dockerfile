@@ -1,42 +1,38 @@
-# Dockerfile for local kernel build on openSUSE Tumbleweed
-FROM ubuntu:latest
+# Dockerfile for local kernel build (openSUSE Tumbleweed base)
+FROM opensuse/tumbleweed
 
 # Update repositories and install all required build dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        bash \
+RUN zypper refresh && zypper install -y --allow-vendor-change --force-resolution \
         bc \
         bison \
         flex \
         gcc \
         make \
-        libncurses-dev \
+        ncurses-devel \
         perl \
         rpm \
-        tar \
-        xz-utils \
-        wget \
-        curl \
-        libelf-dev \
-        uuid-dev \
-        libblkid-dev \
-        libselinux1-dev \
-        zlib1g-dev \
-        libssl-dev \
-        libcap-dev \
-        libattr1-dev \
-        libseccomp-dev \
-        gettext \
+        rpm-build \
+        xz \
+        libelf-devel \
+        libuuid-devel \
+        libblkid-devel \
+        libselinux-devel \
+        zlib-devel \
+        libopenssl-devel \
+        libcap-devel \
+        libattr-devel \
+        libseccomp-devel \
+        gettext-runtime \
         elfutils \
-        parallel \
         python3 \
-        python3-dev \
-        git \
+        python314-base \
+        python314-devel \
         fakeroot \
         dwarves \
         gawk \
-        file \
+        rsync \
         kmod && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/cache/zypp/*
 
 
 # Set working directory inside container
@@ -44,3 +40,4 @@ WORKDIR /workspace
 
 # Default command: bash shell
 CMD ["/bin/bash"]
+

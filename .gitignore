@@ -5,7 +5,7 @@ rpmbuild/
 rpms/
 
 # Kernel source
-linux-6.16.7.tar.xz
+linux-*.tar.xz
 
 # Gemini
 GEMINI.md

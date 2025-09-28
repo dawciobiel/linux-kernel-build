@@ -3,13 +3,13 @@ set -euo pipefail
 
 if [[ $# -ne 2 ]]; then
     echo "Usage: $0 <input-config-path> <output-config-path>"
-    echo "Example: $0 kernel-config/6.16.7-1-default.custom/current kernel-config/6.16.7-1-default.custom/current.simplified"
+    echo "Example: $0 kernel-config/6.16.8-1-default/amd-fx8350.default kernel-config/6.16.8-1-default/custom.config"
     exit 1
 fi
 
 INPUT_CONFIG="$1"
 OUTPUT_CONFIG="$2"
-KERNEL_VERSION="6.16.7"
+KERNEL_VERSION="6.16.8"
 KERNEL_DIR="linux-${KERNEL_VERSION}"
 KERNEL_TAR="${KERNEL_DIR}.tar.xz"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -33,7 +33,7 @@ tar -xf "$KERNEL_TAR"
 
 # 3. Uprość konfigurację
 cd "$KERNEL_DIR"
-echo ">>> Creating simplified config from ${INPUT_CONFIG}..."
+echo ">>> Creating simplified config from ${INPUT_CONFIG}"
 
 # Sprawdzenie, czy plik konfiguracyjny istnieje
 if [[ ! -f "$REPO_ROOT/$INPUT_CONFIG" ]]; then
@@ -45,7 +45,7 @@ cp "$REPO_ROOT/$INPUT_CONFIG" .config
 
 # Uruchomienie localmodconfig
 # To polecenie użyje `lsmod` do wykrycia używanych modułów
-echo ">>> Running 'make localmodconfig'..."
+echo ">>> Running 'make localmodconfig'"
 make localmodconfig
 
 # 4. Zapisz nową konfigurację

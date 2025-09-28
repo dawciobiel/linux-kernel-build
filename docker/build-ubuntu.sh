@@ -1,4 +1,4 @@
 #!/bin/bash
 
 SCRIPT_DIR=$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")
-"$SCRIPT_DIR/build.sh" my-kernel-builder tumbleweed.Dockerfile
+bash "$SCRIPT_DIR/_build_engine" kernel-builder ubuntu.Dockerfile

@@ -1,12 +1,11 @@
 #!/bin/bash
 set -euo pipefail
 
-# Usage: ./ci-kernel-build.sh <kernel-config-path> <kernel-release-suffix>
-# Builds an RPM of Linux kernel 6.16.8 on openSUSE Tumbleweed (or similar RPM-based distro)
-
+# Arg 1: Ścieżka do pliku konfiguracyjnego kernela
+# Arg 2: Sufiks do nazwy kernela (np. nick)
 if [[ $# -ne 2 ]]; then
     echo "Usage: $0 <kernel-config-path> <kernel-release-suffix>"
-    echo "Example: $0 kernel-config/6.16.8-1-default/custom.config ci-build"
+    echo "Example: $0 kernel-config/6.16.8-1-default/custom.config dawciobiel"
     exit 1
 fi
 
@@ -15,16 +14,16 @@ CUSTOM_KERNEL_RELEASE_SUFFIX="$2"
 
 # --- Parametry Budowania ---
 KERNEL_VERSION="6.16.8"
-MAKE_JOBS="$(nproc)" # Use all available cores in CI
+MAKE_JOBS="9" # Dla AMD FX-8350 (liczba rdzeni + 1)
 KERNEL_TAR="linux-${KERNEL_VERSION}.tar.xz"
-REPO_ROOT="$(pwd)" # Assuming script is run from repo root
-RPMBUILD_ROOT="/usr/src/packages" # Standard RPM build dir in CI environment
+REPO_ROOT="/workspace"
+RPMBUILD_ROOT="/root/rpmbuild"
+BUILD_TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
 # --- Logowanie ---
-BUILD_TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-LOG_DIR="${REPO_ROOT}/log/${BUILD_TIMESTAMP}"
+LOG_DIR="$REPO_ROOT/log/${BUILD_TIMESTAMP}"
 mkdir -p "$LOG_DIR"
-LOG_FILE="${LOG_DIR}/build.log"
+LOG_FILE="$LOG_DIR/build.log"
 
 # Przekierowanie całego wyjścia do pliku logu i na ekran
 exec > >(tee -a "$LOG_FILE") 2>&1
@@ -35,19 +34,18 @@ echo ">>> Custom Suffix: $CUSTOM_KERNEL_RELEASE_SUFFIX"
 echo ">>> Full build log will be available at: $LOG_FILE"
 
 # --- Przygotowanie Środowiska ---
-mkdir -p "$RPMBUILD_ROOT"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+mkdir -p "$RPMBUILD_ROOT"/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
 
-# Jeśli kernel tarball nie istnieje → pobierz
-if [[ ! -f "${REPO_ROOT}/${KERNEL_TAR}" ]]; then
+if [[ ! -f "$REPO_ROOT/$KERNEL_TAR" ]]; then
     echo ">>> Downloading kernel source..."
-    wget "https://cdn.kernel.org/pub/linux/kernel/v6.x/${KERNEL_TAR}" -O "${REPO_ROOT}/${KERNEL_TAR}"
+    wget "https://cdn.kernel.org/pub/linux/kernel/v6.x/${KERNEL_TAR}" -O "$REPO_ROOT/$KERNEL_TAR"
 fi
-cp "${REPO_ROOT}/${KERNEL_TAR}" "$RPMBUILD_ROOT/SOURCES/"
+cp "$REPO_ROOT/$KERNEL_TAR" "$RPMBUILD_ROOT/SOURCES/"
 
 # --- Dynamiczne Generowanie Pliku .spec ---
 echo ">>> Generating dynamic .spec file..."
 
-# 1. Przechodzimy do katalogu RPMBUILD/BUILD, aby rozpakować źródła
+# 1. Przechodzimy do katalogu ze źródłami, aby uzyskać finalną nazwę kernela
 cd "$RPMBUILD_ROOT/BUILD"
 tar -xf "$RPMBUILD_ROOT/SOURCES/$KERNEL_TAR"
 cd "linux-$KERNEL_VERSION"
@@ -57,12 +55,12 @@ ls -lA
 echo "-----------------------------------------------------"
 
 # 2. Kopiujemy i przygotowujemy konfigurację
-cp "${REPO_ROOT}/${KERNEL_CONFIG_PATH}" .config
+cp "$REPO_ROOT/$KERNEL_CONFIG_PATH" .config
 make olddefconfig
 
 # 3. Ustalamy finalną nazwę wersji kernela oraz wersję dla RPM
 FINAL_KERNEL_RELEASE=$(make -s kernelrelease LOCALVERSION=-$CUSTOM_KERNEL_RELEASE_SUFFIX)
-RPM_RELEASE_STRING=$(echo "${FINAL_KERNEL_RELEASE}" | sed "s/^${KERNEL_VERSION}-//g" | tr '-' '.')
+RPM_RELEASE_STRING=$(echo "${FINAL_KERNEL_RELEASE}" | sed "s/^${KERNEL_VERSION}-//" | tr '-' '.')
 
 echo ">>> Final kernel release string (for uname -r): $FINAL_KERNEL_RELEASE"
 echo ">>> RPM Release string (for spec file): $RPM_RELEASE_STRING"
@@ -79,17 +77,12 @@ cat > "$RPM_SPEC" <<EOF
 # --- Pakiet Główny (jądro) ---
 Name:           kernel-%{custom_suffix}
 Version:        ${KERNEL_VERSION}
-Release:        %{rpm_release}
+Release:        ${RPM_RELEASE_STRING}
 Summary:        Custom kernel for this project
 License:        GPLv2
 Group:          System/Kernel
 Source0:        ${KERNEL_TAR}
-BuildRequires:  bc, rsync, openssl, openssl-devel, elfutils, rpm-build, dwarves, \
-                bison, flex, gcc, make, ncurses-devel, perl, xz, \
-                libelf-devel, libuuid-devel, libblkid-devel, libselinux-devel, \
-                zlib-devel, libopenssl-devel, libcap-devel, libattr-devel, \
-                libseccomp-devel, gettext-runtime, python3, python3-devel, \
-                fakeroot, gawk, file, kmod
+BuildRequires:  bc, rsync, openssl, openssl-devel, elfutils, dwarves
 Provides:       kernel = %{version}-%{release}
 
 %description
@@ -108,7 +101,8 @@ Kernel modules for the custom kernel (%{final_krelease}).
 # --- Proces Budowania ---
 %prep
 %setup -q -n linux-%{version}
-cp "${REPO_ROOT}/${KERNEL_CONFIG_PATH}" .config
+# Kopiowanie konfiguracji jest już zrobione na zewnątrz, ale spec musi być kompletny
+cp "$REPO_ROOT/$KERNEL_CONFIG_PATH" .config
 make olddefconfig
 
 %build
@@ -138,13 +132,13 @@ echo "--------------------------------------------------------"
 /lib/modules/%{final_krelease}/
 
 %changelog
-* $(date "+%a %b %d %Y") dawciobiel - %{version}-%{release}
+* $(date "+%a %b %d %Y") dawciobiel - Initial custom build.
 - Custom build based on new conventions.
 EOF
 
 # --- Uruchomienie Budowania RPM ---
-echo ">>> Building RPM..."
-rpmbuild -bb --define "_topdir ${RPMBUILD_ROOT}" "$RPM_SPEC"
+echo ">>> Starting RPM build..."
+rpmbuild -bb --define "_topdir $RPMBUILD_ROOT" "$RPM_SPEC"
 RPMBUILD_EXIT_CODE=$?
 
 if [ $RPMBUILD_EXIT_CODE -ne 0 ]; then
@@ -154,11 +148,11 @@ fi
 
 # --- Zakończenie ---
 echo ">>> RPM build finished successfully."
-echo ">>> RPMs are available in ${RPMBUILD_ROOT}/RPMS/x86_64/"
-find "${RPMBUILD_ROOT}/RPMS/x86_64" -name "*.rpm" -exec ls -lh {} + 
+echo ">>> RPMs are available in $RPMBUILD_ROOT/RPMS/x86_64/"
+find "$RPMBUILD_ROOT/RPMS/x86_64" -name "*.rpm" -exec ls -lh {} +
 
-echo ">>> Copying RPMs to artifacts..."
-mkdir -p "${REPO_ROOT}/artifacts/rpms/"
-cp -v "${RPMBUILD_ROOT}"/RPMS/x86_64/*.rpm "${REPO_ROOT}/artifacts/rpms/"
+echo ">>> Copying RPMs to workspace..."
+mkdir -p "$REPO_ROOT/rpms/"
+cp -v "$RPMBUILD_ROOT"/RPMS/x86_64/*.rpm "$REPO_ROOT/rpms/"
 
 echo ">>> Build finished at: $(date)"
