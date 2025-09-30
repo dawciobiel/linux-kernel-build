@@ -10,7 +10,7 @@ if [[ $# -ne 2 ]]; then
 fi
 
 KERNEL_CONFIG_PATH="$1"
-CUSTOM_KERNEL_RELEASE_SUFFIX="$2"
+CUSTOM_KERNEL_RELEASE_SUFFIX="${2}"
 
 # --- Parametry Budowania ---
 KERNEL_VERSION="6.16.8"
@@ -19,6 +19,7 @@ KERNEL_TAR="linux-${KERNEL_VERSION}.tar.xz"
 REPO_ROOT="/workspace"
 RPMBUILD_ROOT="/root/rpmbuild"
 BUILD_TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+CUSTOM_KERNEL_RELEASE_SUFFIX="${CUSTOM_KERNEL_RELEASE_SUFFIX}-${BUILD_TIMESTAMP}"
 
 # --- Logowanie ---
 LOG_DIR="$REPO_ROOT/log/${BUILD_TIMESTAMP}"
@@ -93,7 +94,7 @@ Custom kernel for this project (%{final_krelease}).
 Summary:        Kernel modules for the custom kernel
 Group:          System/Kernel
 Requires:       kernel-%{custom_suffix} = %{version}-%{release}
-Provides:       kernel-modules = %{version}-%{release}
+Provides:       kernel-modules-%{custom_suffix} = %{version}-%{release}
 
 %description modules
 Kernel modules for the custom kernel (%{final_krelease}).
@@ -129,7 +130,7 @@ echo "--------------------------------------------------------"
 /boot/config-%{final_krelease}
 
 %files modules
-/lib/modules/%{final_krelease}/
+/lib/modules/%{final_krelease}/**
 
 %changelog
 * $(date "+%a %b %d %Y") dawciobiel - Initial custom build.

@@ -12,6 +12,7 @@ RUN zypper refresh && zypper install -y --allow-vendor-change --force-resolution
         perl \
         rpm \
         rpm-build \
+        kernel-devel \
         xz \
         libelf-devel \
         libuuid-devel \
