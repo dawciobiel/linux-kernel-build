@@ -33,6 +33,7 @@ RUN zypper refresh && zypper dup -y && zypper install -y --allow-vendor-change -
         gawk \
         rsync \
         wget \
+        rpm-config-SUSE \
         kmod && \
     rm -rf /var/cache/zypp/*
 
