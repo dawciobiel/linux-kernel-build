@@ -37,11 +37,12 @@ echo ">>> Full build log will be available at: $LOG_FILE"
 # --- Przygotowanie Środowiska ---
 mkdir -p "$RPMBUILD_ROOT"/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
 
-if [[ ! -f "$REPO_ROOT/$KERNEL_TAR" ]]; then
+mkdir -p "$REPO_ROOT/kernel-sources"
+if [[ ! -f "$REPO_ROOT/kernel-sources/$KERNEL_TAR" ]]; then
     echo ">>> Downloading kernel source..."
-    wget "https://cdn.kernel.org/pub/linux/kernel/v6.x/${KERNEL_TAR}" -O "$REPO_ROOT/$KERNEL_TAR"
+    wget "https://cdn.kernel.org/pub/linux/kernel/v6.x/${KERNEL_TAR}" -O "$REPO_ROOT/kernel-sources/$KERNEL_TAR"
 fi
-cp "$REPO_ROOT/$KERNEL_TAR" "$RPMBUILD_ROOT/SOURCES/"
+cp "$REPO_ROOT/kernel-sources/$KERNEL_TAR" "$RPMBUILD_ROOT/SOURCES/"
 
 # --- Dynamiczne Generowanie Pliku .spec ---
 echo ">>> Generating dynamic .spec file..."

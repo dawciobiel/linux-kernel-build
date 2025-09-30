@@ -2,7 +2,7 @@
 FROM opensuse/tumbleweed
 
 # Update repositories and install all required build dependencies
-RUN zypper refresh && zypper install -y --allow-vendor-change --force-resolution \
+RUN zypper refresh && zypper dup -y && zypper install -y --allow-vendor-change --force-resolution \
         bc \
         bison \
         flex \
@@ -32,6 +32,7 @@ RUN zypper refresh && zypper install -y --allow-vendor-change --force-resolution
         dwarves \
         gawk \
         rsync \
+        wget \
         kmod && \
     rm -rf /var/cache/zypp/*
 
