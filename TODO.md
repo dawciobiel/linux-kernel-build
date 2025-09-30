@@ -18,5 +18,6 @@
 
 - Create scripts to run *Docker* on the *Codespace* side. But consider if it makes sense to use *Codespace* at all.
 
-## Skończyłem na
-- Tworzę odpowiednie konfigi na podstawie mojej obecnej konfiguracji na Suse Thumbleweed. Niestety Gemini Pro skończył się darmowy limit. Potem przełączył się na Gemini Lite. Ale nastąpiło to w trakcie przetwarzania konfigów. Więc nie jest jasny ich obecny stan. Trzeba od nowa stworzyć konfig wejściowy. I na jego podstawie stworzyć wersję slim. A potem dodać do konfiga podstawowego oraz do wersji slim obsługę sprzętu z VirtualBox'a.
+## Finished on
+- Change number of used CPU cores to 8 or n+1 
+- Add feature for signing kerenl / modules during RPM process

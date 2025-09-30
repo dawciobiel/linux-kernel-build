@@ -13,7 +13,7 @@ CUSTOM_KERNEL_RELEASE_SUFFIX="${2:-}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 DOCKER_IMAGE="kernel-builder"
-BUILD_SCRIPT="/workspace/scripts/local/_local-kernel-build-in-docker"
+BUILD_SCRIPT="/workspace/scripts/common/build-kernel-rpm.sh"
 
 echo ">>> Building kernel in Docker (openSUSE Tumbleweed base)..."
 

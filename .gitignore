@@ -10,3 +10,6 @@ kernel-sources/
 # Gemini
 GEMINI.md
 docs/gemini/
+
+# Ignore shared directory with VirtualBox
+shared-to-vbox/

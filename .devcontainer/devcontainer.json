@@ -22,6 +22,5 @@
       ]
     }
   },
-  "remoteUser": "root",
-  "postCreateCommand": "bash scripts/ci/ci-kernel-build.sh"
+  "remoteUser": "root"
 }
